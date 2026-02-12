@@ -1,330 +1,391 @@
 """
-✝ THE FALLEN ✝ — Web Dashboard
-Main application. Connects to the same PostgreSQL database as the Discord bot.
+✝ THE FALLEN ✝ — Dashboard Database
+Reads from the bot's PostgreSQL json_data table.
+
+Data sources:
+  json_data key='main_data'     → { "users": {...}, "roster": [...] }
+  json_data key='duels_data'    → { "elo": {...}, "duel_history": [...] }
+  json_data key='warnings_data' → { "users": {...}, "recent_warnings": [...] }
 """
 
 import os
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from db import db
-import auth
+import json
+import asyncpg
+import datetime
+from typing import Optional, List, Dict, Any
 
 
-# ==========================================
-# APP LIFECYCLE
-# ==========================================
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Startup/shutdown events."""
-    await db.connect()
-    print("✝ THE FALLEN ✝ Dashboard is live!")
-    yield
-    await db.close()
-    print("Dashboard shutting down.")
-
-
-app = FastAPI(title="The Fallen Dashboard", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
-
-# ==========================================
-# TEMPLATE HELPERS
-# ==========================================
-
-def _base_context(request: Request) -> dict:
-    """Base context passed to every template."""
-    user = auth.get_session(request)
-    return {
-        "request": request,
-        "user": user,
-        "is_staff": user.get("is_staff", False) if user else False,
-    }
-
-
-def _format_number(n) -> str:
-    """Format large numbers with commas."""
-    if n is None:
-        return "0"
-    return f"{int(n):,}"
-
-
-def _format_voice_time(seconds) -> str:
-    """Format seconds into readable time."""
-    if not seconds:
-        return "0m"
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    if hours > 0:
-        return f"{hours}h {minutes}m"
-    return f"{minutes}m"
-
-
-def _elo_rank(elo: int) -> tuple:
-    """Return (name, emoji) for an ELO rating."""
-    if elo >= 2000: return ("Grandmaster", "🏆")
-    if elo >= 1800: return ("Diamond", "💎")
-    if elo >= 1600: return ("Platinum", "🥇")
-    if elo >= 1400: return ("Gold", "🥈")
-    if elo >= 1200: return ("Silver", "🥉")
-    return ("Bronze", "⚔️")
-
-
-def _level_progress(xp: int, level: int) -> int:
-    """Calculate XP progress percentage to next level."""
-    xp_for_current = level * level * 50
-    xp_for_next = (level + 1) * (level + 1) * 50
-    needed = xp_for_next - xp_for_current
-    progress = xp - xp_for_current
-    if needed <= 0:
-        return 100
-    return min(100, max(0, int((progress / needed) * 100)))
-
-
-# Register filters for Jinja2
-templates.env.filters["fnum"] = _format_number
-templates.env.filters["ftime"] = _format_voice_time
-templates.env.globals["elo_rank"] = _elo_rank
-templates.env.globals["level_progress"] = _level_progress
-
-
-# ==========================================
-# AUTH ROUTES
-# ==========================================
-
-@app.get("/auth/login")
-async def login(request: Request):
-    """Redirect to Discord OAuth."""
-    return RedirectResponse(auth.get_login_url())
-
-
-@app.get("/auth/callback")
-async def callback(request: Request, code: str = None, error: str = None):
-    """Handle Discord OAuth callback."""
-    if error or not code:
-        return RedirectResponse("/?error=auth_failed")
+class DashboardDB:
+    def __init__(self):
+        self.pool: Optional[asyncpg.Pool] = None
     
-    # Exchange code for token
-    token_data = await auth.exchange_code(code)
-    if not token_data:
-        return RedirectResponse("/?error=token_failed")
+    async def connect(self):
+        url = os.getenv("DATABASE_URL")
+        if not url:
+            raise RuntimeError("DATABASE_URL not set")
+        self.pool = await asyncpg.create_pool(
+            url, min_size=2, max_size=8,
+            command_timeout=15,
+            server_settings={"application_name": "FallenDashboard"}
+        )
+        print("✅ Dashboard connected to database")
     
-    access_token = token_data.get("access_token")
+    async def close(self):
+        if self.pool:
+            await self.pool.close()
     
-    # Get Discord user info
-    discord_user = await auth.get_discord_user(access_token)
-    if not discord_user:
-        return RedirectResponse("/?error=user_failed")
+    # ==========================================
+    # CORE: Load JSON blobs
+    # ==========================================
     
-    # Check if user is staff by checking guild roles
-    guild_id = os.getenv("GUILD_ID", "")
-    is_staff = False
-    role_ids = []
-    
-    if guild_id:
-        role_ids = await auth.get_user_guild_roles(access_token, guild_id)
-    
-    # Build session data
-    avatar_hash = discord_user.get("avatar")
-    user_id = discord_user["id"]
-    
-    if avatar_hash:
-        avatar_url = f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128"
-    else:
-        avatar_url = f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5}.png"
-    
-    session_data = {
-        "id": int(user_id),
-        "username": discord_user.get("global_name") or discord_user.get("username", "Unknown"),
-        "avatar": avatar_url,
-        "is_staff": is_staff,  # We'll enhance this with role checking
-        "role_ids": role_ids,
-    }
-    
-    # Check database for this user
-    db_user = await db.get_user(int(user_id))
-    if db_user:
-        session_data["level"] = db_user.get("level", 0)
-    
-    response = RedirectResponse("/profile")
-    auth.set_session(response, session_data)
-    return response
-
-
-@app.get("/auth/logout")
-async def logout():
-    """Clear session and redirect home."""
-    response = RedirectResponse("/")
-    auth.clear_session(response)
-    return response
-
-
-# ==========================================
-# PUBLIC ROUTES
-# ==========================================
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Home page with server overview."""
-    ctx = _base_context(request)
-    
-    try:
-        ctx["stats"] = await db.get_server_stats()
-        ctx["top_players"] = await db.get_leaderboard("xp", limit=5)
-        ctx["war_record"] = await db.get_war_record()
-    except Exception as e:
-        print(f"[HOME] Database error: {e}")
-        ctx["stats"] = {}
-        ctx["top_players"] = []
-        ctx["war_record"] = {"total": 0, "wins": 0, "losses": 0, "draws": 0}
-    
-    return templates.TemplateResponse("home.html", ctx)
-
-
-@app.get("/leaderboard", response_class=HTMLResponse)
-async def leaderboard(
-    request: Request,
-    sort: str = Query("xp", description="Sort column"),
-    page: int = Query(1, ge=1),
-):
-    """Leaderboard page with sortable columns."""
-    ctx = _base_context(request)
-    
-    per_page = 25
-    offset = (page - 1) * per_page
-    
-    try:
-        ctx["players"] = await db.get_leaderboard(sort, limit=per_page, offset=offset)
-        ctx["total_users"] = await db.get_total_users()
-    except Exception as e:
-        print(f"[LB] Database error: {e}")
-        ctx["players"] = []
-        ctx["total_users"] = 0
-    
-    ctx["sort"] = sort
-    ctx["page"] = page
-    ctx["per_page"] = per_page
-    ctx["offset"] = offset
-    
-    return templates.TemplateResponse("leaderboard.html", ctx)
-
-
-@app.get("/raids", response_class=HTMLResponse)
-async def raids(request: Request):
-    """Raids & Wars page."""
-    ctx = _base_context(request)
-    
-    try:
-        ctx["recent_raids"] = await db.get_recent_raids(15)
-        ctx["raid_leaders"] = await db.get_raid_leaderboard(10)
-        ctx["war_record"] = await db.get_war_record()
-        ctx["recent_wars"] = await db.get_wars(10)
-    except Exception as e:
-        print(f"[RAIDS] Database error: {e}")
-        ctx["recent_raids"] = []
-        ctx["raid_leaders"] = []
-        ctx["war_record"] = {"total": 0, "wins": 0, "losses": 0, "draws": 0}
-        ctx["recent_wars"] = []
-    
-    return templates.TemplateResponse("raids.html", ctx)
-
-
-# ==========================================
-# AUTHENTICATED ROUTES
-# ==========================================
-
-@app.get("/profile", response_class=HTMLResponse)
-async def profile(request: Request):
-    """Your profile page (requires login)."""
-    ctx = _base_context(request)
-    
-    if not ctx["user"]:
-        return RedirectResponse("/auth/login")
-    
-    user_id = ctx["user"]["id"]
-    
-    try:
-        ctx["profile"] = await db.get_user(user_id)
-        ctx["xp_rank"] = await db.get_user_rank(user_id, "xp")
-        ctx["elo_rank_pos"] = await db.get_user_rank(user_id, "elo_rating")
-        ctx["applications"] = await db.get_user_applications(user_id)
-    except Exception as e:
-        print(f"[PROFILE] Database error: {e}")
-        ctx["profile"] = None
-        ctx["xp_rank"] = 0
-        ctx["elo_rank_pos"] = 0
-        ctx["applications"] = []
-    
-    return templates.TemplateResponse("profile.html", ctx)
-
-
-# ==========================================
-# STAFF ROUTES
-# ==========================================
-
-@app.get("/staff", response_class=HTMLResponse)
-async def staff_dashboard(request: Request):
-    """Staff dashboard (requires staff role)."""
-    ctx = _base_context(request)
-    
-    if not ctx["user"] or not ctx["is_staff"]:
-        return RedirectResponse("/?error=unauthorized")
-    
-    try:
-        ctx["stats"] = await db.get_server_stats()
-        ctx["recent_warnings"] = await db.get_recent_warnings(20)
-        ctx["open_positions"] = await db.get_open_positions()
-        ctx["pending_apps"] = await db.get_applications("applied", 10)
-    except Exception as e:
-        print(f"[STAFF] Database error: {e}")
-        ctx["stats"] = {}
-        ctx["recent_warnings"] = []
-        ctx["open_positions"] = []
-        ctx["pending_apps"] = []
-    
-    return templates.TemplateResponse("staff/dashboard.html", ctx)
-
-
-@app.get("/staff/members", response_class=HTMLResponse)
-async def staff_members(request: Request, q: str = ""):
-    """Staff member lookup."""
-    ctx = _base_context(request)
-    
-    if not ctx["user"] or not ctx["is_staff"]:
-        return RedirectResponse("/?error=unauthorized")
-    
-    ctx["query"] = q
-    ctx["results"] = []
-    
-    if q and len(q) >= 2:
+    async def _get_json_blob(self, key: str) -> Dict:
+        """Load a JSON blob from the json_data table by key."""
         try:
-            ctx["results"] = await db.search_users(q)
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT data FROM json_data WHERE key = $1", key
+                )
+                if row and row["data"]:
+                    d = row["data"]
+                    return json.loads(d) if isinstance(d, str) else d
         except Exception as e:
-            print(f"[STAFF-SEARCH] Error: {e}")
+            print(f"[DB] Error loading {key}: {e}")
+        return {}
     
-    return templates.TemplateResponse("staff/members.html", ctx)
+    async def _get_main_data(self) -> Dict:
+        return await self._get_json_blob("main_data") or {"users": {}, "roster": []}
+    
+    async def _get_duels_data(self) -> Dict:
+        return await self._get_json_blob("duels_data") or {"elo": {}}
+    
+    async def _get_warnings_data(self) -> Dict:
+        return await self._get_json_blob("warnings_data") or {"users": {}, "recent_warnings": []}
+    
+    async def _get_all_users(self) -> Dict[str, Dict]:
+        data = await self._get_main_data()
+        return data.get("users", {})
+    
+    # ==========================================
+    # ROSTER / STAGE RANK
+    # ==========================================
+    
+    async def get_roster(self) -> List:
+        """Get the 10-slot roster array."""
+        data = await self._get_main_data()
+        return data.get("roster", [None] * 10)
+    
+    async def get_stage_rank(self, user_id: int) -> Optional[int]:
+        """Get a user's stage rank (1-10) or None if not on roster."""
+        roster = await self.get_roster()
+        uid = user_id  # roster stores ints or strings
+        for i, slot in enumerate(roster):
+            if slot is not None and str(slot) == str(uid):
+                return i + 1
+        return None
+    
+    # ==========================================
+    # USER QUERIES (with ELO merged in)
+    # ==========================================
+    
+    async def get_user(self, user_id: int) -> Optional[Dict]:
+        """Get a user's full data including ELO and warnings."""
+        users = await self._get_all_users()
+        user = users.get(str(user_id))
+        if not user:
+            return None
+        
+        user["user_id"] = user_id
+        
+        # Merge ELO
+        duels = await self._get_duels_data()
+        user["elo_rating"] = duels.get("elo", {}).get(str(user_id), 1000)
+        
+        # Merge warnings
+        warnings_data = await self._get_warnings_data()
+        warn_user = warnings_data.get("users", {}).get(str(user_id), {})
+        user["warnings"] = warn_user.get("warnings", [])
+        user["warning_points"] = warn_user.get("total_points", 0)
+        
+        # Stage rank
+        user["stage_rank"] = await self.get_stage_rank(user_id)
+        
+        return user
+    
+    async def get_leaderboard(self, sort_by: str = "xp", limit: int = 50, offset: int = 0) -> List[Dict]:
+        """Get leaderboard sorted by a field."""
+        allowed = {"xp", "level", "coins", "elo_rating", "voice_time", "messages",
+                    "wins", "raid_wins", "raid_participation", "weekly_xp", "monthly_xp",
+                    "training_attendance", "tryout_attendance"}
+        if sort_by not in allowed:
+            sort_by = "xp"
+        
+        users = await self._get_all_users()
+        duels = await self._get_duels_data()
+        elo_map = duels.get("elo", {})
+        roster = (await self._get_main_data()).get("roster", [])
+        
+        user_list = []
+        for uid, udata in users.items():
+            udata["user_id"] = int(uid)
+            udata["elo_rating"] = elo_map.get(uid, 1000)
+            # Stage rank
+            stage = None
+            for i, slot in enumerate(roster):
+                if slot is not None and str(slot) == uid:
+                    stage = i + 1
+                    break
+            udata["stage_rank"] = stage
+            user_list.append(udata)
+        
+        user_list.sort(key=lambda u: u.get(sort_by, 0) or 0, reverse=True)
+        return user_list[offset:offset + limit]
+    
+    async def get_user_rank(self, user_id: int, sort_by: str = "xp") -> int:
+        users = await self._get_all_users()
+        uid = str(user_id)
+        if uid not in users:
+            return 0
+        
+        if sort_by == "elo_rating":
+            duels = await self._get_duels_data()
+            elo_map = duels.get("elo", {})
+            user_val = elo_map.get(uid, 1000)
+            rank = 1
+            for other_uid in users:
+                if other_uid != uid and elo_map.get(other_uid, 1000) > user_val:
+                    rank += 1
+            return rank
+        
+        user_val = users[uid].get(sort_by, 0) or 0
+        rank = 1
+        for other_uid, other_data in users.items():
+            if other_uid != uid and (other_data.get(sort_by, 0) or 0) > user_val:
+                rank += 1
+        return rank
+    
+    async def search_users(self, query: str, limit: int = 20) -> List[Dict]:
+        users = await self._get_all_users()
+        duels = await self._get_duels_data()
+        elo_map = duels.get("elo", {})
+        query_lower = query.lower()
+        
+        results = []
+        for uid, udata in users.items():
+            roblox_name = udata.get("roblox_username") or ""
+            if query_lower in roblox_name.lower():
+                udata["user_id"] = int(uid)
+                udata["elo_rating"] = elo_map.get(uid, 1000)
+                results.append(udata)
+                if len(results) >= limit:
+                    break
+        
+        results.sort(key=lambda u: u.get("xp", 0) or 0, reverse=True)
+        return results
+    
+    async def get_total_users(self) -> int:
+        users = await self._get_all_users()
+        return len(users)
+    
+    # ==========================================
+    # STATS
+    # ==========================================
+    
+    async def get_server_stats(self) -> Dict:
+        users = await self._get_all_users()
+        
+        empty = {
+            "total_users": 0, "verified_users": 0, "total_xp": 0,
+            "total_coins": 0, "total_messages": 0, "avg_level": 0,
+            "max_level": 0, "total_duels": 0, "total_raid_participations": 0,
+            "total_trainings": 0, "active_7d": 0, "active_24h": 0,
+        }
+        if not users:
+            return empty
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        stats = dict(empty)
+        stats["total_users"] = len(users)
+        total_level = 0
+        
+        for uid, u in users.items():
+            if u.get("verified"):
+                stats["verified_users"] += 1
+            stats["total_xp"] += u.get("xp", 0) or 0
+            stats["total_coins"] += u.get("coins", 0) or 0
+            stats["total_messages"] += u.get("messages", 0) or 0
+            
+            level = u.get("level", 0) or 0
+            total_level += level
+            if level > stats["max_level"]:
+                stats["max_level"] = level
+            
+            stats["total_duels"] += (u.get("wins", 0) or 0) + (u.get("losses", 0) or 0)
+            stats["total_raid_participations"] += u.get("raid_participation", 0) or 0
+            stats["total_trainings"] += u.get("training_attendance", 0) or 0
+            
+            last_active = u.get("last_active")
+            if last_active:
+                try:
+                    if isinstance(last_active, str):
+                        la = datetime.datetime.fromisoformat(last_active.replace("Z", "+00:00"))
+                    else:
+                        la = last_active
+                    if la.tzinfo is None:
+                        la = la.replace(tzinfo=datetime.timezone.utc)
+                    diff = now - la
+                    if diff.total_seconds() < 86400:
+                        stats["active_24h"] += 1
+                    if diff.total_seconds() < 604800:
+                        stats["active_7d"] += 1
+                except (ValueError, TypeError):
+                    pass
+        
+        if stats["total_users"] > 0:
+            stats["avg_level"] = total_level // stats["total_users"]
+        return stats
+    
+    # ==========================================
+    # WARNINGS
+    # ==========================================
+    
+    async def get_recent_warnings(self, limit: int = 50) -> List[Dict]:
+        """Get recent warnings from the warnings_data blob."""
+        wdata = await self._get_warnings_data()
+        
+        # Try the pre-built recent list first
+        recent = wdata.get("recent_warnings", [])
+        if recent:
+            return recent[:limit]
+        
+        # Fallback: collect from all users
+        all_warnings = []
+        for uid, uinfo in wdata.get("users", {}).items():
+            for w in uinfo.get("warnings", []):
+                warning = dict(w)
+                warning["user_id"] = int(uid)
+                warning["active"] = not warning.get("expired", False)
+                all_warnings.append(warning)
+        
+        all_warnings.sort(
+            key=lambda w: w.get("timestamp", ""),
+            reverse=True
+        )
+        return all_warnings[:limit]
+    
+    async def get_user_warnings(self, user_id: int) -> Dict:
+        """Get warning data for a specific user."""
+        wdata = await self._get_warnings_data()
+        return wdata.get("users", {}).get(str(user_id), {"warnings": [], "total_points": 0})
+    
+    # ==========================================
+    # RAIDS & WARS (from enhanced DB tables)
+    # ==========================================
+    
+    async def get_recent_raids(self, limit: int = 20) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                # Check what columns exist
+                cols = await conn.fetch(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'raid_sessions'"
+                )
+                if not cols:
+                    return []
+                col_names = [c["column_name"] for c in cols]
+                order = "created_at" if "created_at" in col_names else "id"
+                rows = await conn.fetch(
+                    f"SELECT * FROM raid_sessions ORDER BY {order} DESC LIMIT $1", limit
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []
+    
+    async def get_raid_leaderboard(self, limit: int = 20) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(
+                    "SELECT * FROM raid_stats ORDER BY raids_participated DESC LIMIT $1", limit
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []
+    
+    async def get_wars(self, limit: int = 10) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                cols = await conn.fetch(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'wars'"
+                )
+                if not cols:
+                    return []
+                col_names = [c["column_name"] for c in cols]
+                order = "created_at" if "created_at" in col_names else "id"
+                rows = await conn.fetch(
+                    f"SELECT * FROM wars ORDER BY {order} DESC LIMIT $1", limit
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []
+    
+    async def get_war_record(self) -> Dict:
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow('''
+                    SELECT 
+                        COUNT(*) AS total,
+                        COUNT(*) FILTER (WHERE status = 'won') AS wins,
+                        COUNT(*) FILTER (WHERE status = 'lost') AS losses,
+                        COUNT(*) FILTER (WHERE status = 'draw') AS draws
+                    FROM wars WHERE status IN ('won', 'lost', 'draw')
+                ''')
+                return dict(row) if row else {"total": 0, "wins": 0, "losses": 0, "draws": 0}
+        except Exception:
+            return {"total": 0, "wins": 0, "losses": 0, "draws": 0}
+    
+    # ==========================================
+    # RECRUITMENT (from enhanced DB tables)
+    # ==========================================
+    
+    async def get_open_positions(self) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(
+                    "SELECT * FROM recruitment_positions WHERE status = 'open' "
+                    "ORDER BY created_at DESC"
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []
+    
+    async def get_applications(self, status: str = None, limit: int = 50) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                if status:
+                    rows = await conn.fetch(
+                        "SELECT * FROM recruitment_applications WHERE status = $1 "
+                        "ORDER BY created_at DESC LIMIT $2", status, limit
+                    )
+                else:
+                    rows = await conn.fetch(
+                        "SELECT * FROM recruitment_applications "
+                        "ORDER BY created_at DESC LIMIT $1", limit
+                    )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []
+    
+    async def get_user_applications(self, user_id: int) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(
+                    "SELECT a.*, p.title as position_title FROM recruitment_applications a "
+                    "LEFT JOIN recruitment_positions p ON a.position_id = p.id "
+                    "WHERE a.user_id = $1 ORDER BY a.created_at DESC", user_id
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []
 
 
-@app.get("/staff/member/{user_id}", response_class=HTMLResponse)
-async def staff_member_detail(request: Request, user_id: int):
-    """Staff view of a specific member."""
-    ctx = _base_context(request)
-    
-    if not ctx["user"] or not ctx["is_staff"]:
-        return RedirectResponse("/?error=unauthorized")
-    
-    try:
-        ctx["member"] = await db.get_user(user_id)
-        ctx["warnings"] = await db.get_user_warnings(user_id)
-        ctx["applications"] = await db.get_user_applications(user_id)
-    except Exception as e:
-        print(f"[STAFF-MEMBER] Error: {e}")
-        ctx["member"] = None
-        ctx["warnings"] = []
-        ctx["applications"] = []
-    
-    return templates.TemplateResponse("staff/member_detail.html", ctx)
+db = DashboardDB()
