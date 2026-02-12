@@ -579,6 +579,88 @@ a:hover { color: var(--gold); }
 .empty-state h2 { font-family: var(--font-display); color: var(--text-bright); margin-bottom: 8px; }
 .empty-state p { color: var(--text-dim); margin-bottom: 20px; }
 
+/* --- Stage Rank Badges --- */
+.stage-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(243,156,18,0.2), rgba(231,76,60,0.2));
+    border: 1px solid rgba(243,156,18,0.4);
+    color: var(--gold);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+}
+.stage-pill {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(243,156,18,0.15), rgba(231,76,60,0.15));
+    border: 1px solid rgba(243,156,18,0.3);
+    color: var(--gold);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.stage-badge-lg {
+    padding: 4px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(243,156,18,0.2), rgba(231,76,60,0.2));
+    border: 1px solid rgba(243,156,18,0.4);
+    color: var(--gold);
+    font-size: 13px;
+    font-weight: 600;
+}
+.rank-pill.stage-rank {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(243,156,18,0.1);
+}
+
+/* --- Warning Banner (member facing) --- */
+.warning-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 20px;
+    background: rgba(192,57,43,0.08);
+    border: 1px solid rgba(192,57,43,0.25);
+    border-left: 4px solid var(--red-bright);
+    border-radius: var(--radius);
+    margin-bottom: 24px;
+}
+.warning-banner-icon { font-size: 24px; flex-shrink: 0; }
+.warning-banner-title { font-weight: 700; color: var(--red-bright); font-size: 15px; margin-bottom: 4px; }
+.warning-banner-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.warn-critical { color: #e74c3c; }
+.warn-high { color: #e67e22; }
+
+/* --- Warning Items (profile history) --- */
+.warnings-list { display: flex; flex-direction: column; gap: 8px; }
+.warning-item {
+    padding: 12px 16px;
+    background: var(--bg-input);
+    border-radius: 6px;
+    border-left: 3px solid var(--red-bright);
+}
+.warning-item.expired {
+    opacity: 0.5;
+    border-left-color: var(--text-dim);
+}
+.warning-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.warn-cat-badge {
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(243,156,18,0.15);
+    color: var(--gold);
+}
+.warn-points { font-size: 12px; font-weight: 600; color: var(--red-bright); }
+.warn-expired-badge { font-size: 11px; color: var(--text-dim); background: var(--bg-card); padding: 2px 8px; border-radius: 8px; }
+.warn-active-badge { font-size: 11px; color: var(--red-bright); background: rgba(192,57,43,0.15); padding: 2px 8px; border-radius: 8px; }
+.warning-item-reason { font-size: 13px; color: var(--text); }
+.warning-item-date { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
 /* --- Footer --- */
 .footer {
     margin-top: auto;
