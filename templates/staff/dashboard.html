@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Staff Dashboard{% endblock %}
+
+{% block content %}
+<section class="section">
+    <h2 class="section-title">🛡️ Staff Dashboard</h2>
+    
+    <!-- Quick Stats -->
+    <div class="stat-grid compact">
+        <div class="stat-card">
+            <div class="stat-value">{{ (stats.total_users or 0)|fnum }}</div>
+            <div class="stat-label">Total Members</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ (stats.active_24h or 0)|fnum }}</div>
+            <div class="stat-label">Active Today</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ (stats.active_7d or 0)|fnum }}</div>
+            <div class="stat-label">Active This Week</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ recent_warnings|length }}</div>
+            <div class="stat-label">Active Warnings</div>
+        </div>
+    </div>
+
+    <div class="staff-grid">
+        <!-- Member Search -->
+        <div class="staff-card">
+            <h3>🔍 Member Lookup</h3>
+            <form action="/staff/members" method="get" class="search-form">
+                <input type="text" name="q" placeholder="Search Roblox username..." class="search-input">
+                <button type="submit" class="btn btn-sm">Search</button>
+            </form>
+        </div>
+
+        <!-- Open Positions -->
+        <div class="staff-card">
+            <h3>📝 Open Positions</h3>
+            {% if open_positions %}
+            {% for pos in open_positions %}
+            <div class="position-row">
+                <span class="position-title">{{ pos.title }}</span>
+                <span class="position-status">Open</span>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="empty-text">No open positions.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Warnings -->
+    <div class="staff-card full-width">
+        <h3>⚠️ Recent Warnings</h3>
+        {% if recent_warnings %}
+        <table class="mini-table">
+            <thead>
+                <tr><th>User ID</th><th>Category</th><th>Reason</th><th>By</th><th>Date</th></tr>
+            </thead>
+            <tbody>
+                {% for w in recent_warnings[:15] %}
+                <tr>
+                    <td><a href="/staff/member/{{ w.user_id }}">{{ w.user_id }}</a></td>
+                    <td><span class="warn-cat">{{ w.category }}</span></td>
+                    <td class="td-reason">{{ w.reason[:60] }}{% if w.reason|length > 60 %}...{% endif %}</td>
+                    <td>{{ w.moderator_id }}</td>
+                    <td>{{ w.created_at.strftime('%b %d, %H:%M') if w.created_at else '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-text">No active warnings.</p>
+        {% endif %}
+    </div>
+
+    <!-- Pending Applications -->
+    {% if pending_apps %}
+    <div class="staff-card full-width">
+        <h3>📋 Pending Applications</h3>
+        <div class="app-list">
+            {% for app in pending_apps %}
+            <div class="app-row">
+                <span class="app-user"><a href="/staff/member/{{ app.user_id }}">{{ app.user_id }}</a></span>
+                <span class="app-position">{{ app.position_id }}</span>
+                <span class="app-status status-{{ app.status }}">{{ app.status|title }}</span>
+                <span class="app-date">{{ app.created_at.strftime('%b %d') if app.created_at else '' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
