@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Auth Debug{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">🔧 Auth Debug</h2>
+    {% if not session %}
+    <div class="empty-state"><h2>Not Logged In</h2><a href="/auth/login" class="btn">Login with Discord</a></div>
+    {% else %}
+    <div class="profile-section-card full-width" style="margin-bottom:16px">
+        <h3>👤 Session</h3>
+        <div class="debug-grid">
+            <div class="debug-row"><span class="debug-label">User ID</span><span class="debug-value code">{{ session.id }}</span></div>
+            <div class="debug-row"><span class="debug-label">Username</span><span class="debug-value">{{ session.username }}</span></div>
+            <div class="debug-row"><span class="debug-label">Staff</span><span class="debug-value">{% if session.is_staff %}<span style="color:#2ecc71">✅ Yes</span>{% else %}<span style="color:#e74c3c">❌ No</span>{% endif %}</span></div>
+        </div>
+    </div>
+    <div class="profile-section-card full-width" style="margin-bottom:16px">
+        <h3>🎭 Your Role IDs</h3>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:10px">Copy these to <code>STAFF_ROLE_IDS</code> on Render.</p>
+        {% if session.role_ids %}
+        <div class="role-ids-list">{% for rid in session.role_ids %}<div class="role-id-row"><span class="code">{{ rid }}</span>{% if rid|string in (config.STAFF_ROLE_IDS or '') %}<span style="color:#2ecc71;font-size:12px">✓ staff</span>{% endif %}</div>{% endfor %}</div>
+        {% else %}<p class="empty-text">No roles found. Check GUILD_ID.</p>{% endif %}
+    </div>
+    <div class="profile-section-card full-width" style="margin-bottom:16px">
+        <h3>⚙️ Config</h3>
+        <div class="debug-grid">{% for k,v in config.items() %}<div class="debug-row"><span class="debug-label">{{ k }}</span><span class="debug-value code">{{ v }}</span></div>{% endfor %}</div>
+    </div>
+    <div class="profile-section-card full-width">
+        <h3>📋 Fix Staff Access</h3>
+        <div style="font-size:14px;line-height:1.8;color:var(--text)">
+            <p><strong>1.</strong> Find your staff role ID above.</p>
+            <p><strong>2.</strong> Render → fallen-dashboard → Environment → add <code>STAFF_ROLE_IDS</code> (comma-separated IDs).</p>
+            <p><strong>3.</strong> Emergency: add <code>ADMIN_USER_IDS</code> = <code>{{ session.id }}</code></p>
+            <p><strong>4.</strong> Log out & back in (session is cached).</p>
+        </div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
