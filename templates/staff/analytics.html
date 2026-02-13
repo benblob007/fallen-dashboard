@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Staff Analytics{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">📊 Staff Analytics</h2>
+    <div class="staff-nav">
+        <a href="/staff" class="staff-nav-link">Overview</a>
+        <a href="/staff/members" class="staff-nav-link">Members</a>
+        <a href="/staff/analytics" class="staff-nav-link active">Analytics</a>
+        <a href="/staff/guardian" class="staff-nav-link">Guardian</a>
+        <a href="/staff/audit" class="staff-nav-link">Audit Log</a>
+    </div>
+    {% if data %}
+    <div class="stat-grid compact">
+        <div class="stat-card"><div class="stat-value">{{ data.total_users }}</div><div class="stat-label">Total Users</div></div>
+        <div class="stat-card"><div class="stat-value">{{ data.verified_count }}</div><div class="stat-label">Verified</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (data.total_messages or 0)|fnum }}</div><div class="stat-label">Messages</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (eco.total_coins_circulation or 0)|fnum }}</div><div class="stat-label">Coins in Circulation</div></div>
+    </div>
+    <div class="raids-two-col">
+        <div class="profile-section-card">
+            <h3>🟢 Activity</h3>
+            {% set act = data.activity_breakdown or {} %}
+            {% set total = data.total_users or 1 %}
+            <div class="activity-bars">
+                <div class="act-row"><span class="act-label">24h</span><div class="act-bar-wrap"><div class="act-bar green" style="width:{{ (act.get('24h',0)/total*100)|int }}%">{{ act.get('24h',0) }}</div></div></div>
+                <div class="act-row"><span class="act-label">7d</span><div class="act-bar-wrap"><div class="act-bar yellow" style="width:{{ (act.get('7d',0)/total*100)|int }}%">{{ act.get('7d',0) }}</div></div></div>
+                <div class="act-row"><span class="act-label">30d</span><div class="act-bar-wrap"><div class="act-bar orange" style="width:{{ (act.get('30d',0)/total*100)|int }}%">{{ act.get('30d',0) }}</div></div></div>
+                <div class="act-row"><span class="act-label">Inactive</span><div class="act-bar-wrap"><div class="act-bar red" style="width:{{ (act.get('inactive',0)/total*100)|int }}%">{{ act.get('inactive',0) }}</div></div></div>
+            </div>
+        </div>
+        <div class="profile-section-card">
+            <h3>💰 Economy</h3>
+            <div class="stat-rows">
+                <div class="stat-row"><span>Total Coins</span><span>{{ (eco.total_coins_circulation or 0)|fnum }}</span></div>
+                <div class="stat-row"><span>Avg/Player</span><span>{{ (eco.avg_coins or 0)|fnum }}</span></div>
+            </div>
+            <h4 style="margin-top:12px">Top Holders</h4>
+            {% for r in (eco.richest or [])[:5] %}<div class="stat-row"><span>{{ r.name }}</span><span>{{ r.coins|fnum }} FC</span></div>{% endfor %}
+        </div>
+    </div>
+    <div class="profile-section-card full-width" style="margin-top:16px">
+        <h3>📈 Level Distribution</h3>
+        {% set ld = data.level_distribution or {} %}
+        {% set max_ld = ld.values()|max if ld.values()|list else 1 %}
+        <div class="dist-bars">{% for bucket, count in ld.items() %}<div class="dist-row"><span class="dist-label">{{ bucket }}</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:{{ (count/max_ld*100)|int }}%"><span>{{ count }}</span></div></div></div>{% endfor %}</div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
