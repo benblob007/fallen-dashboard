@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}The Fallen Clan{% endblock %}
+{% block content %}
+<section class="section">
+    <div class="clan-hero">
+        <img src="/static/logo.svg" alt="" class="clan-logo">
+        <h1 class="clan-title">✝ THE FALLEN ✝</h1>
+        <p class="clan-tagline">An elite gaming clan forged in shadow and blood.</p>
+    </div>
+
+    <div class="stat-grid">
+        <div class="stat-card"><div class="stat-value">{{ (stats.total_users or 0)|fnum }}</div><div class="stat-label">Members</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (stats.verified_users or 0)|fnum }}</div><div class="stat-label">Verified</div></div>
+        <div class="stat-card"><div class="stat-value">{{ stats.max_level or 0 }}</div><div class="stat-label">Highest Level</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (stats.total_raid_participations or 0)|fnum }}</div><div class="stat-label">Total Raids</div></div>
+    </div>
+
+    {% if war_record and war_record.total > 0 %}
+    <div class="profile-section-card full-width">
+        <h3>🏴 War Record</h3>
+        <div class="war-record-stats" style="margin-bottom:12px">
+            <div class="war-stat win"><span class="war-stat-num">{{ war_record.wins }}</span><span class="war-stat-lbl">Wins</span></div>
+            <div class="war-stat draw"><span class="war-stat-num">{{ war_record.draws }}</span><span class="war-stat-lbl">Draws</span></div>
+            <div class="war-stat loss"><span class="war-stat-num">{{ war_record.losses }}</span><span class="war-stat-lbl">Losses</span></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Roster -->
+    <div class="profile-section-card full-width">
+        <h3>⚔️ Stage Roster</h3>
+        <div class="roster-grid">
+            {% for slot in roster %}
+            <div class="roster-slot {% if slot %}filled{% else %}vacant{% endif %}">
+                <span class="roster-rank">#{{ loop.index }}</span>
+                {% if slot %}<span class="roster-name">{{ slot }}</span>{% else %}<span class="roster-vacant">VACANT</span>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Open Positions -->
+    {% if positions %}
+    <div class="profile-section-card full-width">
+        <h3>📋 Open Positions</h3>
+        <div class="positions-list">
+            {% for p in positions %}
+            <div class="position-card"><span class="position-title">{{ p.title }}</span><span class="position-status">Open</span></div>
+            {% endfor %}
+        </div>
+        {% if user %}<a href="/apply" class="btn btn-sm" style="margin-top:12px">Apply Now →</a>{% else %}<a href="/auth/login" class="btn btn-sm" style="margin-top:12px">Login to Apply</a>{% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
