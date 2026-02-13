@@ -1,39 +1,138 @@
 {% extends "base.html" %}
-{% block title %}Leaderboard{% endblock %}
+{% block title %}My Profile{% endblock %}
 {% block content %}
 <section class="section">
-    <h2 class="section-title">Leaderboard</h2>
-    <div class="lb-tabs">
-        {% for s in [("xp","XP"),("level","Level"),("elo_rating","ELO"),("coins","Coins"),("voice_time","Voice"),("messages","Messages"),("raid_participation","Raids"),("weekly_xp","Weekly")] %}
-        <a href="?sort={{ s[0] }}" class="lb-tab {% if sort == s[0] %}active{% endif %}">{{ s[1] }}</a>
-        {% endfor %}
+    {% if not profile %}
+    <div class="empty-state"><h2>Profile Not Found</h2><p>Make sure you're verified in Discord and have some activity!</p><a href="/" class="btn btn-sm">← Home</a></div>
+    {% else %}
+    <!-- Header -->
+    <div class="profile-header">
+        <div class="profile-avatar-wrap">
+            <img src="{{ user.avatar }}" alt="" class="profile-avatar">
+            <div class="profile-level-badge">{{ profile.level or 0 }}</div>
+        </div>
+        <div class="profile-meta">
+            <h1 class="profile-name">{{ user.username }}</h1>
+            {% if profile.roblox_username %}<div class="profile-roblox">{% if profile.verified %}<span class="verified-check">✓ Verified</span>{% endif %} Roblox: <strong>{{ profile.roblox_username }}</strong></div>{% endif %}
+            <div class="profile-ranks">
+                {% if profile.stage_rank %}<span class="rank-pill stage-rank">⚔️ Stage #{{ profile.stage_rank }}</span>{% endif %}
+                <span class="rank-pill">#{{ xp_rank }} XP</span>
+                {% set rn, re, rc = elo_rank(profile.elo_rating or 1000) %}
+                <span class="rank-pill elo-color" style="border-color:{{ rc }}">{{ re }} {{ rn }} ({{ profile.elo_rating or 1000 }})</span>
+                <span class="rank-pill">#{{ elo_rank_pos }} ELO</span>
+            </div>
+        </div>
     </div>
-    <div class="lb-table-wrap">
-        <table class="lb-table">
-            <thead><tr><th>#</th><th>Player</th><th>Stage</th><th>Lvl</th><th>XP</th><th>ELO</th><th>Coins</th><th>W/L</th><th>Raids</th></tr></thead>
-            <tbody>
-                {% for p in players %}
-                {% set pos = loop.index + offset %}
-                <tr class="{% if pos <= 3 %}top-three{% endif %}">
-                    <td class="td-rank">{% if pos == 1 %}🥇{% elif pos == 2 %}🥈{% elif pos == 3 %}🥉{% else %}{{ pos }}{% endif %}</td>
-                    <td class="td-name">{% if p.verified %}<span class="verified-dot">✓</span>{% endif %}{{ p.roblox_username or 'Unknown' }}</td>
-                    <td>{% if p.stage_rank %}<span class="stage-pill">⚔️{{ p.stage_rank }}</span>{% else %}—{% endif %}</td>
-                    <td><span class="level-pill">{{ p.level or 0 }}</span></td>
-                    <td>{{ (p.xp or 0)|fnum }}</td>
-                    <td>{% set rn, re, rc = elo_rank(p.elo_rating or 1000) %}<span class="elo-badge" title="{{ rn }}">{{ re }}{{ p.elo_rating or 1000 }}</span></td>
-                    <td>{{ (p.coins or 0)|fnum }}</td>
-                    <td><span class="wins">{{ p.wins or 0 }}</span>/<span class="losses">{{ p.losses or 0 }}</span></td>
-                    <td>{{ p.raid_participation or 0 }}</td>
-                </tr>
-                {% endfor %}
-                {% if not players %}<tr><td colspan="9" class="td-empty">No players found.</td></tr>{% endif %}
-            </tbody>
-        </table>
+
+    <!-- XP Bar -->
+    <div class="xp-progress-section">
+        <div class="xp-labels"><span>Lvl {{ profile.level or 0 }}</span><span>{{ (profile.xp or 0)|fnum }} XP</span><span>Lvl {{ (profile.level or 0)+1 }}</span></div>
+        <div class="xp-bar-outer"><div class="xp-bar-inner" style="width:{{ level_progress(profile.xp or 0, profile.level or 0) }}%"></div></div>
     </div>
-    <div class="pagination">
-        {% if page > 1 %}<a href="?sort={{ sort }}&page={{ page-1 }}" class="btn btn-sm">← Prev</a>{% endif %}
-        <span class="page-info">Page {{ page }} · {{ total_users|fnum }} players</span>
-        {% if players|length == per_page %}<a href="?sort={{ sort }}&page={{ page+1 }}" class="btn btn-sm">Next →</a>{% endif %}
+
+    <!-- Warning Banner -->
+    {% if profile.warning_points and profile.warning_points > 0 %}
+    <div class="warning-banner">
+        <div class="warning-banner-icon">⚠️</div>
+        <div class="warning-banner-content">
+            <div class="warning-banner-title">Active Warning Points: {{ profile.warning_points }}</div>
+            <div class="warning-banner-text">
+                {{ profile.warnings|length }} warning(s) on record.
+                {% if profile.warning_points >= 12 %}<strong class="warn-critical">Risk of ban.</strong>
+                {% elif profile.warning_points >= 8 %}<strong class="warn-high">Further violations → serious action.</strong>
+                {% elif profile.warning_points >= 4 %}Please follow server rules.{% endif %}
+                Points expire after 30 days.
+            </div>
+        </div>
     </div>
+    {% endif %}
+
+    <!-- Quick Stats -->
+    <div class="profile-stats-grid">
+        <div class="pstat-card"><div class="pstat-icon">💬</div><div class="pstat-value">{{ (profile.messages or 0)|fnum }}</div><div class="pstat-label">Messages</div></div>
+        <div class="pstat-card"><div class="pstat-icon">🎙️</div><div class="pstat-value">{{ (profile.voice_time or 0)|ftime }}</div><div class="pstat-label">Voice Time</div></div>
+        <div class="pstat-card"><div class="pstat-icon">💰</div><div class="pstat-value">{{ (profile.coins or 0)|fnum }}</div><div class="pstat-label">FCoins</div></div>
+        <div class="pstat-card"><div class="pstat-icon">🔥</div><div class="pstat-value">{{ profile.daily_streak or 0 }}</div><div class="pstat-label">Streak</div></div>
+    </div>
+
+    <!-- Combat + Attendance -->
+    <div class="profile-two-col">
+        <div class="profile-section-card">
+            <h3>⚔️ Combat</h3>
+            <div class="stat-rows">
+                <div class="stat-row"><span>ELO</span><span>{% set rn, re, rc = elo_rank(profile.elo_rating or 1000) %}{{ re }} {{ profile.elo_rating or 1000 }} ({{ rn }})</span></div>
+                <div class="stat-row"><span>Duel W/L</span><span><span class="wins">{{ profile.wins or 0 }}</span> / <span class="losses">{{ profile.losses or 0 }}</span></span></div>
+                <div class="stat-row"><span>Raid W/L</span><span><span class="wins">{{ profile.raid_wins or 0 }}</span> / <span class="losses">{{ profile.raid_losses or 0 }}</span></span></div>
+                <div class="stat-row"><span>Raids Joined</span><span>{{ profile.raid_participation or 0 }}</span></div>
+            </div>
+        </div>
+        <div class="profile-section-card">
+            <h3>📅 Attendance</h3>
+            <div class="stat-rows">
+                <div class="stat-row"><span>Trainings</span><span>{{ profile.training_attendance or 0 }}</span></div>
+                <div class="stat-row"><span>Tryouts</span><span>{{ profile.tryout_attendance or 0 }}</span></div>
+                <div class="stat-row"><span>Tryout Pass/Fail</span><span><span class="wins">{{ profile.tryout_passes or 0 }}</span>/<span class="losses">{{ profile.tryout_fails or 0 }}</span></span></div>
+                <div class="stat-row"><span>Events Hosted</span><span>{{ profile.events_hosted or 0 }}</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory -->
+    {% if profile.inventory_items %}
+    <div class="profile-section-card full-width">
+        <h3>🎒 Inventory</h3>
+        <div class="inventory-grid">
+            {% for item in profile.inventory_items %}
+            <div class="inv-item"><span class="inv-name">{{ item.name }}</span><span class="inv-type">{{ item.type }}</span></div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Duels -->
+    {% if duel_history %}
+    <div class="profile-section-card full-width">
+        <h3>⚔️ Recent Duels</h3>
+        <div class="duel-feed">
+            {% for d in duel_history %}
+            <div class="duel-item {% if d.winner == profile.user_id|string %}won{% else %}lost{% endif %}">
+                <span class="duel-result">{% if d.winner == profile.user_id|string %}🏆 WON{% else %}💀 LOST{% endif %}</span>
+                <span class="duel-elo-change">{% if d.winner == profile.user_id|string %}{{ d.winner_elo_before }} → {{ d.winner_elo_after }} (+{{ d.winner_elo_after - d.winner_elo_before }}){% else %}{{ d.loser_elo_before }} → {{ d.loser_elo_after }} ({{ d.loser_elo_after - d.loser_elo_before }}){% endif %}</span>
+                <span class="duel-date">{{ d.completed_at|timeago }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <a href="/duels" class="btn btn-sm" style="margin-top:8px">View All Duels →</a>
+    </div>
+    {% endif %}
+
+    <!-- Warnings -->
+    {% if profile.warnings %}
+    <div class="profile-section-card full-width">
+        <h3>⚠️ My Warnings</h3>
+        <div class="warnings-list">
+            {% for w in profile.warnings %}
+            <div class="warning-item {% if w.get('expired', False) %}expired{% endif %}">
+                <div class="warning-item-header">
+                    <span class="warn-cat-badge">{{ w.category or 'General' }}</span>
+                    <span class="warn-points">+{{ w.points or 0 }}pts</span>
+                    {% if w.get('expired', False) %}<span class="warn-expired-badge">Expired</span>{% else %}<span class="warn-active-badge">Active</span>{% endif %}
+                </div>
+                <div class="warning-item-reason">{{ w.reason or 'No reason' }}</div>
+                <div class="warning-item-date">{{ (w.timestamp or '')[:10] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Applications -->
+    {% if applications %}
+    <div class="profile-section-card full-width">
+        <h3>📝 My Applications</h3>
+        {% for a in applications %}<div class="app-row"><span>{{ a.position_title or 'Position' }}</span><span class="app-status status-{{ a.status }}">{{ a.status|title }}</span></div>{% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
 </section>
 {% endblock %}
