@@ -1,50 +1,21 @@
 {% extends "base.html" %}
 {% block title %}Member Search{% endblock %}
-
 {% block content %}
 <section class="section">
-    <h2 class="section-title">🔍 Member Lookup</h2>
-    
-    <form action="/staff/members" method="get" class="search-form-lg">
-        <input type="text" name="q" value="{{ query }}" placeholder="Search by Roblox username..." class="search-input-lg" autofocus>
-        <button type="submit" class="btn">Search</button>
-    </form>
-    
-    {% if query %}
-    <p class="search-results-count">{{ results|length }} result{% if results|length != 1 %}s{% endif %} for "{{ query }}"</p>
-    {% endif %}
-    
-    {% if results %}
-    <div class="lb-table-wrap">
-        <table class="lb-table">
-            <thead>
-                <tr>
-                    <th>User ID</th>
-                    <th>Roblox</th>
-                    <th>Level</th>
-                    <th>XP</th>
-                    <th>ELO</th>
-                    <th>Coins</th>
-                    <th>Verified</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in results %}
-                <tr>
-                    <td>{{ u.user_id }}</td>
-                    <td><strong>{{ u.roblox_username or '—' }}</strong></td>
-                    <td><span class="level-pill">{{ u.level }}</span></td>
-                    <td>{{ u.xp|fnum }}</td>
-                    <td>{{ u.elo_rating or 1000 }}</td>
-                    <td>{{ u.coins|fnum }}</td>
-                    <td>{% if u.verified %}✓{% else %}—{% endif %}</td>
-                    <td><a href="/staff/member/{{ u.user_id }}" class="btn btn-sm">View</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <h2 class="section-title">🔍 Member Search</h2>
+    <div class="staff-nav">
+        <a href="/staff" class="staff-nav-link">Overview</a>
+        <a href="/staff/members" class="staff-nav-link active">Members</a>
+        <a href="/staff/analytics" class="staff-nav-link">Analytics</a>
+        <a href="/staff/guardian" class="staff-nav-link">Guardian</a>
+        <a href="/staff/audit" class="staff-nav-link">Audit Log</a>
     </div>
-    {% endif %}
+    <form action="/staff/members" method="get" class="search-form wide"><input type="text" name="q" value="{{ query }}" placeholder="Search by Roblox username or Discord ID..." class="search-input"><button type="submit" class="btn">Search</button></form>
+    {% if results %}
+    <table class="lb-table" style="margin-top:16px">
+        <thead><tr><th>User ID</th><th>Roblox</th><th>Level</th><th>XP</th><th>ELO</th><th>Coins</th><th>Verified</th><th></th></tr></thead>
+        <tbody>{% for r in results %}<tr><td class="code">{{ r.user_id }}</td><td>{{ r.roblox_username or '—' }}</td><td>{{ r.level or 0 }}</td><td>{{ (r.xp or 0)|fnum }}</td><td>{{ r.elo_rating or 1000 }}</td><td>{{ (r.coins or 0)|fnum }}</td><td>{% if r.verified %}✓{% else %}—{% endif %}</td><td><a href="/staff/member/{{ r.user_id }}" class="btn btn-sm">View</a></td></tr>{% endfor %}</tbody>
+    </table>
+    {% elif query %}<p class="empty-text" style="margin-top:16px">No results for "{{ query }}".</p>{% endif %}
 </section>
 {% endblock %}
