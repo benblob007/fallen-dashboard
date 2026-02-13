@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<section class="section">
+    {% if not profile %}
+    <div class="empty-state">
+        <h2>Profile Not Found</h2>
+        <p>You haven't been tracked by the bot yet. Make sure you're verified in the Discord server and have some activity!</p>
+        <a href="/" class="btn btn-sm">← Back Home</a>
+    </div>
+    {% else %}
+    
+    <!-- Profile Header -->
+    <div class="profile-header">
+        <div class="profile-avatar-wrap">
+            <img src="{{ user.avatar }}" alt="" class="profile-avatar">
+            <div class="profile-level-badge">{{ profile.level or 0 }}</div>
+        </div>
+        <div class="profile-meta">
+            <h1 class="profile-name">{{ user.username }}</h1>
+            {% if profile.roblox_username %}
+            <div class="profile-roblox">
+                {% if profile.verified %}<span class="verified-check">✓ Verified</span>{% endif %}
+                Roblox: <strong>{{ profile.roblox_username }}</strong>
+            </div>
+            {% endif %}
+            <div class="profile-ranks">
+                {% if profile.stage_rank %}
+                <span class="rank-pill stage-rank">⚔️ Stage Rank #{{ profile.stage_rank }}</span>
+                {% endif %}
+                <span class="rank-pill xp-rank">#{{ xp_rank }} XP</span>
+                {% set rank_name, rank_emoji = elo_rank(profile.elo_rating or 1000) %}
+                <span class="rank-pill elo-rank">{{ rank_emoji }} {{ rank_name }} ({{ profile.elo_rating or 1000 }})</span>
+                <span class="rank-pill elo-pos">#{{ elo_rank_pos }} ELO</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- XP Progress Bar -->
+    <div class="xp-progress-section">
+        <div class="xp-labels">
+            <span>Level {{ profile.level or 0 }}</span>
+            <span>{{ (profile.xp or 0)|fnum }} XP</span>
+            <span>Level {{ (profile.level or 0) + 1 }}</span>
+        </div>
+        <div class="xp-bar-outer">
+            <div class="xp-bar-inner" style="width: {{ level_progress(profile.xp or 0, profile.level or 0) }}%"></div>
+        </div>
+    </div>
+
+    <!-- Warning Status Banner (visible to member) -->
+    {% if profile.warning_points and profile.warning_points > 0 %}
+    <div class="warning-banner">
+        <div class="warning-banner-icon">⚠️</div>
+        <div class="warning-banner-content">
+            <div class="warning-banner-title">Active Warning Points: {{ profile.warning_points }}</div>
+            <div class="warning-banner-text">
+                You have {{ profile.warnings|length }} warning(s) on record.
+                {% if profile.warning_points >= 12 %}
+                    <strong class="warn-critical">You are at risk of a ban.</strong>
+                {% elif profile.warning_points >= 8 %}
+                    <strong class="warn-high">Further violations may result in serious action.</strong>
+                {% elif profile.warning_points >= 4 %}
+                    Please be mindful of server rules.
+                {% endif %}
+                Points expire after 30 days.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Stats Grid -->
+    <div class="profile-stats-grid">
+        <div class="pstat-card">
+            <div class="pstat-icon">💬</div>
+            <div class="pstat-value">{{ (profile.messages or 0)|fnum }}</div>
+            <div class="pstat-label">Messages</div>
+        </div>
+        <div class="pstat-card">
+            <div class="pstat-icon">🎙️</div>
+            <div class="pstat-value">{{ (profile.voice_time or 0)|ftime }}</div>
+            <div class="pstat-label">Voice Time</div>
+        </div>
+        <div class="pstat-card">
+            <div class="pstat-icon">💰</div>
+            <div class="pstat-value">{{ (profile.coins or 0)|fnum }}</div>
+            <div class="pstat-label">FCoins</div>
+        </div>
+        <div class="pstat-card">
+            <div class="pstat-icon">🔥</div>
+            <div class="pstat-value">{{ profile.daily_streak or 0 }}</div>
+            <div class="pstat-label">Daily Streak</div>
+        </div>
+    </div>
+
+    <!-- Combat & Activity -->
+    <div class="profile-two-col">
+        <div class="profile-section-card">
+            <h3>⚔️ Combat</h3>
+            <div class="combat-stats">
+                <div class="combat-row">
+                    <span class="combat-label">ELO Rating</span>
+                    <span class="combat-value">
+                        {% set rank_name, rank_emoji = elo_rank(profile.elo_rating or 1000) %}
+                        {{ rank_emoji }} {{ profile.elo_rating or 1000 }} ({{ rank_name }})
+                    </span>
+                </div>
+                <div class="combat-row">
+                    <span class="combat-label">Duel W/L</span>
+                    <span class="combat-value"><span class="wins">{{ profile.wins or 0 }}</span> / <span class="losses">{{ profile.losses or 0 }}</span></span>
+                </div>
+                <div class="combat-row">
+                    <span class="combat-label">Raid W/L</span>
+                    <span class="combat-value"><span class="wins">{{ profile.raid_wins or 0 }}</span> / <span class="losses">{{ profile.raid_losses or 0 }}</span></span>
+                </div>
+                <div class="combat-row">
+                    <span class="combat-label">Raids Joined</span>
+                    <span class="combat-value">{{ profile.raid_participation or 0 }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="profile-section-card">
+            <h3>📅 Attendance</h3>
+            <div class="combat-stats">
+                <div class="combat-row">
+                    <span class="combat-label">Trainings</span>
+                    <span class="combat-value">{{ profile.training_attendance or 0 }}</span>
+                </div>
+                <div class="combat-row">
+                    <span class="combat-label">Tryouts Attended</span>
+                    <span class="combat-value">{{ profile.tryout_attendance or 0 }}</span>
+                </div>
+                <div class="combat-row">
+                    <span class="combat-label">Tryout Pass/Fail</span>
+                    <span class="combat-value"><span class="wins">{{ profile.tryout_passes or 0 }}</span> / <span class="losses">{{ profile.tryout_fails or 0 }}</span></span>
+                </div>
+                <div class="combat-row">
+                    <span class="combat-label">Events Hosted</span>
+                    <span class="combat-value">{{ profile.events_hosted or 0 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warnings History (visible to member) -->
+    {% if profile.warnings %}
+    <div class="profile-section-card full-width">
+        <h3>⚠️ My Warnings</h3>
+        <div class="warnings-list">
+            {% for w in profile.warnings %}
+            <div class="warning-item {% if w.get('expired', False) %}expired{% endif %}">
+                <div class="warning-item-header">
+                    <span class="warn-cat-badge">{{ w.category or 'General' }}</span>
+                    <span class="warn-points">+{{ w.points or 0 }} pts</span>
+                    {% if w.get('expired', False) %}
+                    <span class="warn-expired-badge">Expired</span>
+                    {% else %}
+                    <span class="warn-active-badge">Active</span>
+                    {% endif %}
+                </div>
+                <div class="warning-item-reason">{{ w.reason or 'No reason provided' }}</div>
+                <div class="warning-item-date">{{ w.timestamp[:10] if w.timestamp else '' }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Achievements -->
+    {% if profile.achievements %}
+    <div class="profile-section-card full-width">
+        <h3>🏅 Achievements</h3>
+        <div class="achievements-grid">
+            {% for ach in profile.achievements %}
+            <div class="achievement-badge">{{ ach }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Applications -->
+    {% if applications %}
+    <div class="profile-section-card full-width">
+        <h3>📝 My Applications</h3>
+        <div class="app-list">
+            {% for app in applications %}
+            <div class="app-row">
+                <span class="app-position">{{ app.position_title or 'Position' }}</span>
+                <span class="app-status status-{{ app.status }}">{{ app.status|title }}</span>
+                <span class="app-date">{{ app.created_at.strftime('%b %d, %Y') if app.created_at else '' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}The Fallen{% endblock %} — ✝ THE FALLEN ✝</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-inner">
+            <a href="/" class="nav-brand">
+                <img src="/static/logo.svg" alt="" class="nav-logo-img">
+                <span class="brand-text">THE FALLEN</span>
+            </a>
+            
+            <div class="nav-links">
+                <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">Home</a>
+                <a href="/leaderboard" class="nav-link {% if 'leaderboard' in request.url.path %}active{% endif %}">Leaderboard</a>
+                <a href="/raids" class="nav-link {% if request.url.path == '/raids' %}active{% endif %}">Raids & Wars</a>
+                {% if is_staff %}
+                <a href="/staff" class="nav-link staff-link {% if '/staff' in request.url.path %}active{% endif %}">🛡️ Staff</a>
+                {% endif %}
+            </div>
+            
+            <div class="nav-auth">
+                {% if user %}
+                <div class="user-pill">
+                    <img src="{{ user.avatar }}" alt="" class="user-avatar">
+                    <span class="user-name">{{ user.username }}</span>
+                    <div class="user-dropdown">
+                        <a href="/profile">My Profile</a>
+                        <a href="/auth/debug">Auth Debug</a>
+                        <a href="/auth/logout" class="logout-link">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="/auth/login" class="btn btn-login">
+                    <svg width="18" height="14" viewBox="0 0 71 55" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:6px">
+                        <path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.4 37.4 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 4.9a.2.2 0 00-.1.1A60 60 0 00.4 44.1a.2.2 0 00.1.2 58.7 58.7 0 0017.7 9 .2.2 0 00.3-.1 42 42 0 003.6-5.9.2.2 0 00-.1-.3 38.7 38.7 0 01-5.5-2.6.2.2 0 01 0-.4c.4-.3.8-.6 1.1-.9a.2.2 0 01.2 0 41.9 41.9 0 0035.6 0 .2.2 0 01.2 0l1.1.9a.2.2 0 010 .4c-1.8 1-3.6 1.9-5.5 2.6a.2.2 0 00-.1.3 47.2 47.2 0 003.6 5.9.2.2 0 00.3.1A58.5 58.5 0 0070.1 44.3a.2.2 0 00.1-.2c1.4-14.1-2.3-26.3-9.7-37.2a.2.2 0 00-.1 0zM23.7 36.3c-3.2 0-5.9-3-5.9-6.6s2.6-6.6 5.9-6.6c3.3 0 6 3 5.9 6.6 0 3.7-2.6 6.6-5.9 6.6zm21.8 0c-3.2 0-5.9-3-5.9-6.6s2.6-6.6 5.9-6.6c3.3 0 6 3 5.9 6.6 0 3.7-2.6 6.6-5.9 6.6z" fill="white"/>
+                    </svg>
+                    Login with Discord
+                </a>
+                {% endif %}
+            </div>
+            
+            <button class="nav-hamburger" onclick="this.parentElement.querySelector('.nav-links').classList.toggle('open')">☰</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <img src="/static/logo.svg" alt="" class="footer-logo">
+            <span class="footer-brand">✝ THE FALLEN ✝</span>
+            <span class="footer-sep">—</span>
+            <span class="footer-text">Gaming Clan Dashboard</span>
+        </div>
+    </footer>
+</body>
+</html>
