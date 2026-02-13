@@ -1,34 +1,59 @@
 """
-✝ THE FALLEN ✝ — Web Dashboard
-Main application with role-based staff access, auth debugging, and proper error handling.
+✝ THE FALLEN ✝ — Web Dashboard (v2 Complete)
+Full-featured dashboard with all public pages, user pages, staff tools, analytics.
 """
 
-import os
+import os, time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Query
+from collections import defaultdict
+from fastapi import FastAPI, Request, Query, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from db import db
+from starlette.middleware.base import BaseHTTPMiddleware
+from db import db, WARNING_CATEGORIES
 import auth
 
 
+# ==========================================
+# RATE LIMITING MIDDLEWARE
+# ==========================================
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, max_requests=60, window=60):
+        super().__init__(app)
+        self.max_requests = max_requests
+        self.window = window
+        self.requests = defaultdict(list)
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path.startswith("/static"):
+            return await call_next(request)
+        ip = request.client.host if request.client else "unknown"
+        now = time.time()
+        self.requests[ip] = [t for t in self.requests[ip] if now - t < self.window]
+        if len(self.requests[ip]) >= self.max_requests:
+            return JSONResponse({"error": "Rate limited"}, status_code=429)
+        self.requests[ip].append(now)
+        return await call_next(request)
+
+
+# ==========================================
+# APP SETUP
+# ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
-    print("✝ THE FALLEN ✝ Dashboard is live!")
-    # Log config on startup
     staff_roles = auth.get_staff_role_ids()
     admin_ids = auth.get_admin_user_ids()
-    guild_id = os.getenv("GUILD_ID", "NOT SET")
-    print(f"[CONFIG] GUILD_ID: {guild_id}")
-    print(f"[CONFIG] STAFF_ROLE_IDS: {staff_roles or 'NOT SET — staff panel disabled'}")
-    print(f"[CONFIG] ADMIN_USER_IDS: {admin_ids or 'NOT SET — no override'}")
+    print(f"✝ THE FALLEN ✝ Dashboard live!")
+    print(f"[CONFIG] GUILD_ID: {os.getenv('GUILD_ID', 'NOT SET')}")
+    print(f"[CONFIG] STAFF_ROLE_IDS: {staff_roles or 'NOT SET'}")
+    print(f"[CONFIG] ADMIN_USER_IDS: {admin_ids or 'NOT SET'}")
     yield
     await db.close()
 
-
 app = FastAPI(title="The Fallen Dashboard", lifespan=lifespan)
+app.add_middleware(RateLimitMiddleware, max_requests=120, window=60)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -36,8 +61,7 @@ templates = Jinja2Templates(directory="templates")
 # ==========================================
 # TEMPLATE HELPERS
 # ==========================================
-
-def _base_context(request: Request) -> dict:
+def _ctx(request: Request) -> dict:
     user = auth.get_session(request)
     return {
         "request": request,
@@ -45,122 +69,128 @@ def _base_context(request: Request) -> dict:
         "is_staff": user.get("is_staff", False) if user else False,
     }
 
-
-def _format_number(n) -> str:
+def _fnum(n) -> str:
     if n is None: return "0"
     return f"{int(n):,}"
 
-
-def _format_voice_time(seconds) -> str:
+def _ftime(seconds) -> str:
     if not seconds: return "0m"
-    seconds = int(seconds)
-    h, m = seconds // 3600, (seconds % 3600) // 60
-    return f"{h}h {m}m" if h > 0 else f"{m}m"
-
+    s = int(seconds)
+    h, m = s // 3600, (s % 3600) // 60
+    return f"{h}h {m}m" if h else f"{m}m"
 
 def _elo_rank(elo) -> tuple:
     elo = int(elo or 1000)
-    if elo >= 2000: return ("Grandmaster", "🏆")
-    if elo >= 1800: return ("Diamond", "💎")
-    if elo >= 1600: return ("Platinum", "🥇")
-    if elo >= 1400: return ("Gold", "🥈")
-    if elo >= 1200: return ("Silver", "🥉")
-    return ("Bronze", "⚔️")
-
+    if elo >= 2000: return ("Grandmaster", "🏆", "#ffd700")
+    if elo >= 1800: return ("Diamond", "💎", "#b9f2ff")
+    if elo >= 1600: return ("Platinum", "🥇", "#e5e4e2")
+    if elo >= 1400: return ("Gold", "🥈", "#f39c12")
+    if elo >= 1200: return ("Silver", "🥉", "#95a5a6")
+    return ("Bronze", "⚔️", "#cd7f32")
 
 def _level_progress(xp, level) -> int:
     xp, level = xp or 0, level or 0
-    xp_for_current = level * level * 50
-    xp_for_next = (level + 1) * (level + 1) * 50
-    needed = xp_for_next - xp_for_current
+    cur = level * level * 50
+    nxt = (level + 1) * (level + 1) * 50
+    needed = nxt - cur
     if needed <= 0: return 100
-    return min(100, max(0, int(((xp - xp_for_current) / needed) * 100)))
+    return min(100, max(0, int(((xp - cur) / needed) * 100)))
 
+def _time_ago(iso_str) -> str:
+    if not iso_str: return "Never"
+    try:
+        import datetime
+        if isinstance(iso_str, str):
+            dt = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        else:
+            dt = iso_str
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        diff = now - dt
+        secs = diff.total_seconds()
+        if secs < 60: return "Just now"
+        if secs < 3600: return f"{int(secs//60)}m ago"
+        if secs < 86400: return f"{int(secs//3600)}h ago"
+        return f"{int(secs//86400)}d ago"
+    except:
+        return str(iso_str)[:10]
 
-templates.env.filters["fnum"] = _format_number
-templates.env.filters["ftime"] = _format_voice_time
+templates.env.filters["fnum"] = _fnum
+templates.env.filters["ftime"] = _ftime
+templates.env.filters["timeago"] = _time_ago
 templates.env.globals["elo_rank"] = _elo_rank
 templates.env.globals["level_progress"] = _level_progress
 
 
 # ==========================================
+# ERROR HANDLERS
+# ==========================================
+@app.exception_handler(404)
+async def not_found(request: Request, exc):
+    return templates.TemplateResponse("error.html", {
+        "request": request, "user": auth.get_session(request), "is_staff": False,
+        "error_code": 404, "error_title": "Page Not Found",
+        "error_msg": "The page you're looking for doesn't exist."
+    }, status_code=404)
+
+@app.exception_handler(500)
+async def server_error(request: Request, exc):
+    return templates.TemplateResponse("error.html", {
+        "request": request, "user": auth.get_session(request), "is_staff": False,
+        "error_code": 500, "error_title": "Server Error",
+        "error_msg": "Something went wrong. Try again later."
+    }, status_code=500)
+
+
+# ==========================================
 # AUTH ROUTES
 # ==========================================
-
 @app.get("/auth/login")
 async def login():
     return RedirectResponse(auth.get_login_url())
 
-
 @app.get("/auth/callback")
 async def callback(request: Request, code: str = None, error: str = None):
-    """Handle Discord OAuth callback with full staff detection."""
     if error or not code:
-        print(f"[AUTH] Callback error: {error}")
         return RedirectResponse("/?error=auth_failed")
-    
-    # Step 1: Exchange code for token
     token_data = await auth.exchange_code(code)
     if not token_data:
         return RedirectResponse("/?error=token_failed")
-    
     access_token = token_data.get("access_token")
-    
-    # Step 2: Get Discord user info
     discord_user = await auth.get_discord_user(access_token)
     if not discord_user:
         return RedirectResponse("/?error=user_failed")
-    
     user_id = discord_user["id"]
-    user_id_int = int(user_id)
-    
-    # Step 3: Get guild member data (roles)
+    uid_int = int(user_id)
     guild_id = os.getenv("GUILD_ID", "")
     role_ids = []
     nick = None
-    
     if guild_id:
-        member_data = await auth.get_user_guild_member(access_token, guild_id)
-        if member_data:
-            role_ids = member_data.get("roles", [])
-            nick = member_data.get("nick")
-        else:
-            print(f"[AUTH] ⚠️ Could not fetch guild member for {user_id} — they may not be in the server")
-    else:
-        print(f"[AUTH] ⚠️ GUILD_ID not set — cannot check roles")
-    
-    # Step 4: Check staff status
-    is_staff = auth.check_is_staff(user_id_int, role_ids)
-    
-    # Step 5: Build avatar URL
+        member = await auth.get_user_guild_member(access_token, guild_id)
+        if member:
+            role_ids = member.get("roles", [])
+            nick = member.get("nick")
+    is_staff = auth.check_is_staff(uid_int, role_ids)
     avatar_hash = discord_user.get("avatar")
-    if avatar_hash:
-        avatar_url = f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128"
-    else:
-        avatar_url = f"https://cdn.discordapp.com/embed/avatars/{user_id_int % 5}.png"
-    
-    # Step 6: Build session
-    session_data = {
-        "id": user_id_int,
+    avatar_url = (f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128"
+                  if avatar_hash else f"https://cdn.discordapp.com/embed/avatars/{uid_int % 5}.png")
+    session = {
+        "id": uid_int,
         "username": nick or discord_user.get("global_name") or discord_user.get("username", "Unknown"),
         "discord_username": discord_user.get("username", "Unknown"),
         "avatar": avatar_url,
         "is_staff": is_staff,
         "role_ids": role_ids,
     }
-    
-    # Step 7: Merge bot data
-    db_user = await db.get_user(user_id_int)
+    db_user = await db.get_user(uid_int)
     if db_user:
-        session_data["level"] = db_user.get("level", 0)
-        session_data["roblox_username"] = db_user.get("roblox_username")
-    
-    print(f"[AUTH] ✅ Login complete: {session_data['username']} (staff={is_staff}, roles={len(role_ids)})")
-    
+        session["level"] = db_user.get("level", 0)
+        session["roblox_username"] = db_user.get("roblox_username")
+    print(f"[AUTH] ✅ {session['username']} logged in (staff={is_staff}, roles={len(role_ids)})")
     response = RedirectResponse("/profile")
-    auth.set_session(response, session_data)
+    auth.set_session(response, session)
     return response
-
 
 @app.get("/auth/logout")
 async def logout():
@@ -168,155 +198,336 @@ async def logout():
     auth.clear_session(response)
     return response
 
-
 @app.get("/auth/debug", response_class=HTMLResponse)
 async def auth_debug(request: Request):
-    """Debug endpoint - shows your session data and auth config.
-    Useful for finding your role IDs to set STAFF_ROLE_IDS.
-    """
-    ctx = _base_context(request)
-    session = auth.get_session(request)
-    
-    config_info = {
+    c = _ctx(request)
+    c["session"] = auth.get_session(request)
+    c["config"] = {
         "GUILD_ID": os.getenv("GUILD_ID", "NOT SET"),
         "STAFF_ROLE_IDS": os.getenv("STAFF_ROLE_IDS", "NOT SET"),
-        "ADMIN_USER_IDS": os.getenv("ADMIN_USER_IDS", "NOT SET") if ctx.get("is_staff") else "HIDDEN",
+        "ADMIN_USER_IDS": os.getenv("ADMIN_USER_IDS", "NOT SET") if c.get("is_staff") else "HIDDEN",
         "DASHBOARD_URL": os.getenv("DASHBOARD_URL", "NOT SET"),
     }
-    
-    ctx["session"] = session
-    ctx["config"] = config_info
-    return templates.TemplateResponse("auth_debug.html", ctx)
+    return templates.TemplateResponse("auth_debug.html", c)
 
 
 # ==========================================
 # PUBLIC ROUTES
 # ==========================================
-
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    ctx = _base_context(request)
+    c = _ctx(request)
     try:
-        ctx["stats"] = await db.get_server_stats()
-        ctx["top_players"] = await db.get_leaderboard("xp", limit=5)
-        ctx["war_record"] = await db.get_war_record()
-        ctx["roster"] = await db.get_roster()
+        c["stats"] = await db.get_server_stats()
+        c["top_players"] = await db.get_leaderboard("xp", limit=5)
+        c["war_record"] = await db.get_war_record()
     except Exception as e:
-        print(f"[HOME] Database error: {e}")
-        ctx["stats"] = {}
-        ctx["top_players"] = []
-        ctx["war_record"] = {"total": 0, "wins": 0, "losses": 0, "draws": 0}
-        ctx["roster"] = []
-    return templates.TemplateResponse("home.html", ctx)
-
+        print(f"[HOME] {e}")
+        c.update(stats={}, top_players=[], war_record={"total":0,"wins":0,"losses":0,"draws":0})
+    return templates.TemplateResponse("home.html", c)
 
 @app.get("/leaderboard", response_class=HTMLResponse)
 async def leaderboard(request: Request, sort: str = Query("xp"), page: int = Query(1, ge=1)):
-    ctx = _base_context(request)
-    per_page = 25
-    offset = (page - 1) * per_page
+    c = _ctx(request)
+    pp = 25
+    off = (page - 1) * pp
     try:
-        ctx["players"] = await db.get_leaderboard(sort, limit=per_page, offset=offset)
-        ctx["total_users"] = await db.get_total_users()
+        c["players"] = await db.get_leaderboard(sort, limit=pp, offset=off)
+        c["total_users"] = await db.get_total_users()
     except Exception as e:
-        print(f"[LB] Database error: {e}")
-        ctx["players"] = []
-        ctx["total_users"] = 0
-    ctx.update({"sort": sort, "page": page, "per_page": per_page, "offset": offset})
-    return templates.TemplateResponse("leaderboard.html", ctx)
-
+        print(f"[LB] {e}")
+        c.update(players=[], total_users=0)
+    c.update(sort=sort, page=page, per_page=pp, offset=off)
+    return templates.TemplateResponse("leaderboard.html", c)
 
 @app.get("/raids", response_class=HTMLResponse)
 async def raids(request: Request):
-    ctx = _base_context(request)
+    c = _ctx(request)
     try:
-        ctx["recent_raids"] = await db.get_recent_raids(15)
-        ctx["raid_leaders"] = await db.get_raid_leaderboard(10)
-        ctx["war_record"] = await db.get_war_record()
-        ctx["recent_wars"] = await db.get_wars(10)
+        c["recent_raids"] = await db.get_recent_raids(15)
+        c["raid_leaders"] = await db.get_raid_leaderboard(10)
+        c["war_record"] = await db.get_war_record()
+        c["recent_wars"] = await db.get_wars(10)
     except Exception as e:
-        print(f"[RAIDS] Database error: {e}")
-        ctx["recent_raids"] = []
-        ctx["raid_leaders"] = []
-        ctx["war_record"] = {"total": 0, "wins": 0, "losses": 0, "draws": 0}
-        ctx["recent_wars"] = []
-    return templates.TemplateResponse("raids.html", ctx)
+        print(f"[RAIDS] {e}")
+        c.update(recent_raids=[], raid_leaders=[], war_record={"total":0,"wins":0,"losses":0,"draws":0}, recent_wars=[])
+    return templates.TemplateResponse("raids.html", c)
+
+@app.get("/duels", response_class=HTMLResponse)
+async def duels(request: Request):
+    c = _ctx(request)
+    try:
+        c["recent_duels"] = await db.get_duel_history(50)
+        c["elo_top"] = await db.get_leaderboard("elo_rating", limit=10)
+        c["elo_dist"] = await db.get_elo_distribution()
+    except Exception as e:
+        print(f"[DUELS] {e}")
+        c.update(recent_duels=[], elo_top=[], elo_dist={})
+    return templates.TemplateResponse("duels.html", c)
+
+@app.get("/economy", response_class=HTMLResponse)
+async def economy(request: Request):
+    c = _ctx(request)
+    try:
+        c["eco"] = await db.get_economy_stats()
+        c["shop"] = await db.get_shop_catalog()
+    except Exception as e:
+        print(f"[ECONOMY] {e}")
+        c.update(eco={"total_coins_circulation":0,"avg_coins":0,"richest":[]}, shop=[])
+    return templates.TemplateResponse("economy.html", c)
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics(request: Request):
+    c = _ctx(request)
+    try:
+        c["data"] = await db.get_analytics()
+    except Exception as e:
+        print(f"[ANALYTICS] {e}")
+        c["data"] = {}
+    return templates.TemplateResponse("analytics.html", c)
+
+@app.get("/clan", response_class=HTMLResponse)
+async def clan(request: Request):
+    c = _ctx(request)
+    try:
+        c["stats"] = await db.get_server_stats()
+        c["war_record"] = await db.get_war_record()
+        c["roster"] = await db.get_roster()
+        c["positions"] = await db.get_open_positions()
+    except Exception as e:
+        print(f"[CLAN] {e}")
+        c.update(stats={}, war_record={"total":0,"wins":0,"losses":0,"draws":0}, roster=[], positions=[])
+    return templates.TemplateResponse("clan.html", c)
+
+@app.get("/apply", response_class=HTMLResponse)
+async def apply_page(request: Request):
+    c = _ctx(request)
+    if not c["user"]:
+        return RedirectResponse("/auth/login")
+    try:
+        c["positions"] = await db.get_open_positions()
+        c["my_apps"] = await db.get_user_applications(c["user"]["id"])
+    except Exception as e:
+        print(f"[APPLY] {e}")
+        c.update(positions=[], my_apps=[])
+    return templates.TemplateResponse("apply.html", c)
+
+@app.post("/apply/submit")
+async def apply_submit(request: Request, position_id: int = Form(...), answers: str = Form(...)):
+    user = auth.get_session(request)
+    if not user:
+        return RedirectResponse("/auth/login")
+    ok = await db.submit_application(user["id"], position_id, answers)
+    if ok:
+        await db.add_audit(user["id"], user.get("username", "?"), "submitted_application",
+                          target_id=position_id, details=f"Applied to position {position_id}")
+    return RedirectResponse("/apply?submitted=1", status_code=303)
 
 
 # ==========================================
 # AUTHENTICATED ROUTES
 # ==========================================
-
 @app.get("/profile", response_class=HTMLResponse)
 async def profile(request: Request):
-    ctx = _base_context(request)
-    if not ctx["user"]:
+    c = _ctx(request)
+    if not c["user"]:
         return RedirectResponse("/auth/login")
-    user_id = ctx["user"]["id"]
+    uid = c["user"]["id"]
     try:
-        ctx["profile"] = await db.get_user(user_id)
-        ctx["xp_rank"] = await db.get_user_rank(user_id, "xp")
-        ctx["elo_rank_pos"] = await db.get_user_rank(user_id, "elo_rating")
-        ctx["applications"] = await db.get_user_applications(user_id)
+        c["profile"] = await db.get_user(uid)
+        c["xp_rank"] = await db.get_user_rank(uid, "xp")
+        c["elo_rank_pos"] = await db.get_user_rank(uid, "elo_rating")
+        c["duel_history"] = await db.get_user_duel_history(uid, 10)
+        c["applications"] = await db.get_user_applications(uid)
     except Exception as e:
-        print(f"[PROFILE] Database error: {e}")
-        ctx["profile"] = None
-        ctx["xp_rank"] = 0
-        ctx["elo_rank_pos"] = 0
-        ctx["applications"] = []
-    return templates.TemplateResponse("profile.html", ctx)
+        print(f"[PROFILE] {e}")
+        c.update(profile=None, xp_rank=0, elo_rank_pos=0, duel_history=[], applications=[])
+    return templates.TemplateResponse("profile.html", c)
 
 
 # ==========================================
 # STAFF ROUTES
 # ==========================================
+def _require_staff(c):
+    return not c["user"] or not c["is_staff"]
 
 @app.get("/staff", response_class=HTMLResponse)
 async def staff_dashboard(request: Request):
-    ctx = _base_context(request)
-    if not ctx["user"] or not ctx["is_staff"]:
-        return RedirectResponse("/?error=unauthorized")
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
     try:
-        ctx["stats"] = await db.get_server_stats()
-        ctx["recent_warnings"] = await db.get_recent_warnings(20)
-        ctx["open_positions"] = await db.get_open_positions()
-        ctx["pending_apps"] = await db.get_applications("applied", 10)
+        c["stats"] = await db.get_server_stats()
+        c["recent_warnings"] = await db.get_recent_warnings(20)
+        c["open_positions"] = await db.get_open_positions()
+        c["pending_apps"] = await db.get_applications("applied", 10)
+        c["recent_audit"] = await db.get_audit_log(10)
+        c["guardian"] = await db.get_guardian_stats()
     except Exception as e:
-        print(f"[STAFF] Database error: {e}")
-        ctx["stats"] = {}
-        ctx["recent_warnings"] = []
-        ctx["open_positions"] = []
-        ctx["pending_apps"] = []
-    return templates.TemplateResponse("staff/dashboard.html", ctx)
-
+        print(f"[STAFF] {e}")
+        c.update(stats={}, recent_warnings=[], open_positions=[], pending_apps=[], recent_audit=[], guardian={})
+    await db.add_audit(c["user"]["id"], c["user"].get("username","?"), "viewed_staff_dashboard")
+    return templates.TemplateResponse("staff/dashboard.html", c)
 
 @app.get("/staff/members", response_class=HTMLResponse)
 async def staff_members(request: Request, q: str = ""):
-    ctx = _base_context(request)
-    if not ctx["user"] or not ctx["is_staff"]:
-        return RedirectResponse("/?error=unauthorized")
-    ctx["query"] = q
-    ctx["results"] = []
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    c["query"] = q
+    c["results"] = []
     if q and len(q) >= 2:
         try:
-            ctx["results"] = await db.search_users(q)
+            c["results"] = await db.search_users(q)
         except Exception as e:
-            print(f"[STAFF-SEARCH] Error: {e}")
-    return templates.TemplateResponse("staff/members.html", ctx)
-
+            print(f"[STAFF-SEARCH] {e}")
+        if c["results"]:
+            await db.add_audit(c["user"]["id"], c["user"].get("username","?"),
+                              "searched_members", details=f"query: {q}")
+    return templates.TemplateResponse("staff/members.html", c)
 
 @app.get("/staff/member/{user_id}", response_class=HTMLResponse)
 async def staff_member_detail(request: Request, user_id: int):
-    ctx = _base_context(request)
-    if not ctx["user"] or not ctx["is_staff"]:
-        return RedirectResponse("/?error=unauthorized")
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
     try:
-        ctx["member"] = await db.get_user(user_id)
-        ctx["warn_data"] = await db.get_user_warnings(user_id)
-        ctx["applications"] = await db.get_user_applications(user_id)
+        c["member"] = await db.get_user(user_id)
+        c["warn_data"] = await db.get_user_warnings(user_id)
+        c["duel_history"] = await db.get_user_duel_history(user_id, 20)
+        c["applications"] = await db.get_user_applications(user_id)
     except Exception as e:
-        print(f"[STAFF-MEMBER] Error: {e}")
-        ctx["member"] = None
-        ctx["warn_data"] = {"warnings": [], "total_points": 0}
-        ctx["applications"] = []
-    return templates.TemplateResponse("staff/member_detail.html", ctx)
+        print(f"[STAFF-MEMBER] {e}")
+        c.update(member=None, warn_data={"warnings":[],"total_points":0}, duel_history=[], applications=[])
+    await db.add_audit(c["user"]["id"], c["user"].get("username","?"),
+                      "viewed_member", target_id=user_id)
+    return templates.TemplateResponse("staff/member_detail.html", c)
+
+@app.get("/staff/member/{user_id}", response_class=HTMLResponse)
+async def staff_member_detail(request: Request, user_id: int):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    try:
+        c["member"] = await db.get_user(user_id)
+        c["warn_data"] = await db.get_user_warnings(user_id)
+        c["duel_history"] = await db.get_user_duel_history(user_id, 20)
+        c["applications"] = await db.get_user_applications(user_id)
+        c["warn_categories"] = WARNING_CATEGORIES
+        c["transactions"] = await db.get_transactions(user_id, 20)
+        c["action_history"] = await db.get_action_history(user_id, 15)
+    except Exception as e:
+        print(f"[STAFF-MEMBER] {e}")
+        c.update(member=None, warn_data={"warnings":[],"total_points":0},
+                 duel_history=[], applications=[], warn_categories=WARNING_CATEGORIES,
+                 transactions=[], action_history=[])
+    c["success"] = request.query_params.get("success", "")
+    await db.add_audit(c["user"]["id"], c["user"].get("username","?"),
+                      "viewed_member", target_id=user_id)
+    return templates.TemplateResponse("staff/member_detail.html", c)
+
+
+# ── Staff Action POST Routes ────────────────────────────
+
+@app.post("/staff/action/warn/{user_id}")
+async def staff_action_warn(request: Request, user_id: int,
+                             category: str = Form(...), reason: str = Form("")):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    await db.queue_action("warn", user_id, staff["id"], staff.get("username","?"),
+                          {"category": category, "reason": reason})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_warn",
+                      target_id=user_id, details=f"{category}: {reason[:100]}")
+    return RedirectResponse(f"/staff/member/{user_id}?success=warn_queued", status_code=303)
+
+@app.post("/staff/action/timeout/{user_id}")
+async def staff_action_timeout(request: Request, user_id: int,
+                                duration: int = Form(10), reason: str = Form("")):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    await db.queue_action("timeout", user_id, staff["id"], staff.get("username","?"),
+                          {"duration_minutes": duration, "reason": reason})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_timeout",
+                      target_id=user_id, details=f"{duration}m: {reason[:100]}")
+    return RedirectResponse(f"/staff/member/{user_id}?success=timeout_queued", status_code=303)
+
+@app.post("/staff/action/adjust_xp/{user_id}")
+async def staff_action_xp(request: Request, user_id: int, amount: int = Form(...)):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    await db.queue_action("add_xp", user_id, staff["id"], staff.get("username","?"),
+                          {"amount": amount})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_xp_adjust",
+                      target_id=user_id, details=f"{amount:+d} XP")
+    return RedirectResponse(f"/staff/member/{user_id}?success=xp_queued", status_code=303)
+
+@app.post("/staff/action/adjust_coins/{user_id}")
+async def staff_action_coins(request: Request, user_id: int,
+                              amount: int = Form(...), reason: str = Form("")):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    await db.queue_action("add_coins", user_id, staff["id"], staff.get("username","?"),
+                          {"amount": amount, "reason": reason})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_coin_adjust",
+                      target_id=user_id, details=f"{amount:+d} FC: {reason[:80]}")
+    return RedirectResponse(f"/staff/member/{user_id}?success=coins_queued", status_code=303)
+
+@app.post("/staff/action/set_elo/{user_id}")
+async def staff_action_elo(request: Request, user_id: int, elo: int = Form(...)):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    await db.queue_action("set_elo", user_id, staff["id"], staff.get("username","?"),
+                          {"elo": elo})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_elo_set",
+                      target_id=user_id, details=f"Set ELO → {elo}")
+    return RedirectResponse(f"/staff/member/{user_id}?success=elo_queued", status_code=303)
+
+@app.post("/staff/action/remove_warn/{user_id}")
+async def staff_action_remove_warn(request: Request, user_id: int,
+                                    warning_id: int = Form(...)):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    await db.queue_action("remove_warning", user_id, staff["id"], staff.get("username","?"),
+                          {"warning_id": warning_id})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_remove_warn",
+                      target_id=user_id, details=f"Warning #{warning_id}")
+    return RedirectResponse(f"/staff/member/{user_id}?success=warn_remove_queued", status_code=303)
+
+
+@app.get("/staff/audit", response_class=HTMLResponse)
+async def staff_audit(request: Request):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    try:
+        c["logs"] = await db.get_audit_log(200)
+    except Exception as e:
+        print(f"[AUDIT] {e}")
+        c["logs"] = []
+    return templates.TemplateResponse("staff/audit_log.html", c)
+
+@app.get("/staff/analytics", response_class=HTMLResponse)
+async def staff_analytics(request: Request):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    try:
+        c["data"] = await db.get_analytics()
+        c["eco"] = await db.get_economy_stats()
+    except Exception as e:
+        print(f"[STAFF-ANALYTICS] {e}")
+        c.update(data={}, eco={})
+    return templates.TemplateResponse("staff/analytics.html", c)
+
+@app.get("/staff/guardian", response_class=HTMLResponse)
+async def staff_guardian(request: Request):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    try:
+        c["guardian"] = await db.get_guardian_stats()
+        c["guardian_events"] = await db.get_guardian_audit_events(30)
+    except Exception as e:
+        print(f"[GUARDIAN] {e}")
+        c.update(guardian={}, guardian_events=[])
+    await db.add_audit(c["user"]["id"], c["user"].get("username","?"), "viewed_guardian")
+    return templates.TemplateResponse("staff/guardian.html", c)
