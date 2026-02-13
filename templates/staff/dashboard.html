@@ -1,58 +1,61 @@
 {% extends "base.html" %}
 {% block title %}Staff Dashboard{% endblock %}
-
 {% block content %}
 <section class="section">
     <h2 class="section-title">🛡️ Staff Dashboard</h2>
-    
-    <div class="stat-grid compact">
-        <div class="stat-card"><div class="stat-value">{{ (stats.total_users or 0)|fnum }}</div><div class="stat-label">Total Members</div></div>
-        <div class="stat-card"><div class="stat-value">{{ (stats.active_24h or 0)|fnum }}</div><div class="stat-label">Active Today</div></div>
-        <div class="stat-card"><div class="stat-value">{{ (stats.active_7d or 0)|fnum }}</div><div class="stat-label">Active This Week</div></div>
-        <div class="stat-card"><div class="stat-value">{{ recent_warnings|length }}</div><div class="stat-label">Recent Warnings</div></div>
+    <div class="staff-nav">
+        <a href="/staff" class="staff-nav-link active">Overview</a>
+        <a href="/staff/members" class="staff-nav-link">Members</a>
+        <a href="/staff/analytics" class="staff-nav-link">Analytics</a>
+        <a href="/staff/guardian" class="staff-nav-link">Guardian</a>
+        <a href="/staff/audit" class="staff-nav-link">Audit Log</a>
     </div>
-
+    <div class="stat-grid compact">
+        <div class="stat-card"><div class="stat-value">{{ (stats.total_users or 0)|fnum }}</div><div class="stat-label">Members</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (stats.active_24h or 0)|fnum }}</div><div class="stat-label">Active 24h</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (stats.active_7d or 0)|fnum }}</div><div class="stat-label">Active 7d</div></div>
+        <div class="stat-card"><div class="stat-value">{{ recent_warnings|length }}</div><div class="stat-label">Warnings</div></div>
+    </div>
+    {% if guardian and guardian.commands_today %}
+    <div class="staff-card full-width" style="margin-bottom:16px">
+        <h3>🛡️ Guardian Status <a href="/staff/guardian" class="btn btn-sm" style="float:right">Details →</a></h3>
+        <div class="stat-grid compact">
+            <div class="stat-card"><div class="stat-value">{{ guardian.commands_today or 0 }}</div><div class="stat-label">Cmds Today</div></div>
+            <div class="stat-card"><div class="stat-value">{{ guardian.errors_today or 0 }}</div><div class="stat-label">Errors</div></div>
+            <div class="stat-card {% if guardian.active_abuse_flags %}accent{% endif %}"><div class="stat-value">{{ guardian.active_abuse_flags or 0 }}</div><div class="stat-label">Abuse Flags</div></div>
+        </div>
+    </div>
+    {% endif %}
     <div class="staff-grid">
         <div class="staff-card">
             <h3>🔍 Member Lookup</h3>
-            <form action="/staff/members" method="get" class="search-form">
-                <input type="text" name="q" placeholder="Search Roblox username..." class="search-input">
-                <button type="submit" class="btn btn-sm">Search</button>
-            </form>
+            <form action="/staff/members" method="get" class="search-form"><input type="text" name="q" placeholder="Search username or ID..." class="search-input"><button type="submit" class="btn btn-sm">Search</button></form>
         </div>
         <div class="staff-card">
             <h3>📝 Open Positions</h3>
-            {% if open_positions %}
-            {% for pos in open_positions %}
-            <div class="position-row"><span class="position-title">{{ pos.title }}</span><span class="position-status">Open</span></div>
-            {% endfor %}
-            {% else %}
-            <p class="empty-text">No open positions.</p>
-            {% endif %}
+            {% if open_positions %}{% for p in open_positions %}<div class="position-row"><span>{{ p.title }}</span><span class="position-status">Open</span></div>{% endfor %}
+            {% else %}<p class="empty-text">None.</p>{% endif %}
         </div>
     </div>
-
     <div class="staff-card full-width">
         <h3>⚠️ Recent Warnings</h3>
         {% if recent_warnings %}
-        <table class="mini-table">
-            <thead><tr><th>User</th><th>Category</th><th>Reason</th><th>Pts</th><th>Staff</th><th>Date</th></tr></thead>
-            <tbody>
-                {% for w in recent_warnings[:15] %}
-                <tr>
-                    <td><a href="/staff/member/{{ w.user_id }}">{{ w.user_id }}</a></td>
-                    <td><span class="warn-cat">{{ w.category or 'general' }}</span></td>
-                    <td class="td-reason">{{ (w.reason or '')[:60] }}{% if (w.reason or '')|length > 60 %}...{% endif %}</td>
-                    <td>{{ w.points or 0 }}</td>
-                    <td>{{ w.staff_id or '?' }}</td>
-                    <td>{{ (w.timestamp or '')[:10] }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="empty-text">No warnings data available. Sync warnings to PostgreSQL from the bot.</p>
-        {% endif %}
+        <table class="mini-table"><thead><tr><th>User</th><th>Category</th><th>Reason</th><th>Pts</th><th>Staff</th><th>Date</th></tr></thead>
+        <tbody>{% for w in recent_warnings[:15] %}<tr><td><a href="/staff/member/{{ w.user_id }}">{{ w.user_id }}</a></td><td><span class="warn-cat">{{ w.category or '?' }}</span></td><td class="td-reason">{{ (w.reason or '')[:50] }}</td><td>{{ w.points or 0 }}</td><td>{{ w.staff_id or '?' }}</td><td>{{ (w.timestamp or '')[:10] }}</td></tr>{% endfor %}</tbody></table>
+        {% else %}<p class="empty-text">No warnings. Sync warnings_data to PostgreSQL via BOT_PATCH.</p>{% endif %}
     </div>
+    {% if pending_apps %}
+    <div class="staff-card full-width">
+        <h3>📋 Pending Applications ({{ pending_apps|length }})</h3>
+        {% for a in pending_apps %}<div class="app-row"><a href="/staff/member/{{ a.user_id }}">{{ a.user_id }}</a><span>{{ a.position_id }}</span><span class="app-status status-{{ a.status }}">{{ a.status|title }}</span></div>{% endfor %}
+    </div>
+    {% endif %}
+    {% if recent_audit %}
+    <div class="staff-card full-width">
+        <h3>📜 Recent Staff Actions</h3>
+        <table class="mini-table"><thead><tr><th>Staff</th><th>Action</th><th>Target</th><th>When</th></tr></thead>
+        <tbody>{% for l in recent_audit %}<tr><td>{{ l.staff_name or l.staff_id }}</td><td>{{ l.action }}</td><td>{{ l.target_id or '—' }}</td><td>{{ l.created_at|timeago if l.created_at else '' }}</td></tr>{% endfor %}</tbody></table>
+    </div>
+    {% endif %}
 </section>
 {% endblock %}
