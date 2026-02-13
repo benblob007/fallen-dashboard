@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">Leaderboard</h2>
+    <div class="lb-tabs">
+        {% for s in [("xp","XP"),("level","Level"),("elo_rating","ELO"),("coins","Coins"),("voice_time","Voice"),("messages","Messages"),("raid_participation","Raids"),("weekly_xp","Weekly")] %}
+        <a href="?sort={{ s[0] }}" class="lb-tab {% if sort == s[0] %}active{% endif %}">{{ s[1] }}</a>
+        {% endfor %}
+    </div>
+    <div class="lb-table-wrap">
+        <table class="lb-table">
+            <thead><tr><th>#</th><th>Player</th><th>Stage</th><th>Lvl</th><th>XP</th><th>ELO</th><th>Coins</th><th>W/L</th><th>Raids</th></tr></thead>
+            <tbody>
+                {% for p in players %}
+                {% set pos = loop.index + offset %}
+                <tr class="{% if pos <= 3 %}top-three{% endif %}">
+                    <td class="td-rank">{% if pos == 1 %}🥇{% elif pos == 2 %}🥈{% elif pos == 3 %}🥉{% else %}{{ pos }}{% endif %}</td>
+                    <td class="td-name">{% if p.verified %}<span class="verified-dot">✓</span>{% endif %}{{ p.roblox_username or 'Unknown' }}</td>
+                    <td>{% if p.stage_rank %}<span class="stage-pill">⚔️{{ p.stage_rank }}</span>{% else %}—{% endif %}</td>
+                    <td><span class="level-pill">{{ p.level or 0 }}</span></td>
+                    <td>{{ (p.xp or 0)|fnum }}</td>
+                    <td>{% set rn, re, rc = elo_rank(p.elo_rating or 1000) %}<span class="elo-badge" title="{{ rn }}">{{ re }}{{ p.elo_rating or 1000 }}</span></td>
+                    <td>{{ (p.coins or 0)|fnum }}</td>
+                    <td><span class="wins">{{ p.wins or 0 }}</span>/<span class="losses">{{ p.losses or 0 }}</span></td>
+                    <td>{{ p.raid_participation or 0 }}</td>
+                </tr>
+                {% endfor %}
+                {% if not players %}<tr><td colspan="9" class="td-empty">No players found.</td></tr>{% endif %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination">
+        {% if page > 1 %}<a href="?sort={{ sort }}&page={{ page-1 }}" class="btn btn-sm">← Prev</a>{% endif %}
+        <span class="page-info">Page {{ page }} · {{ total_users|fnum }} players</span>
+        {% if players|length == per_page %}<a href="?sort={{ sort }}&page={{ page+1 }}" class="btn btn-sm">Next →</a>{% endif %}
+    </div>
+</section>
+{% endblock %}
