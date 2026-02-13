@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">📜 Audit Log</h2>
+    <div class="staff-nav">
+        <a href="/staff" class="staff-nav-link">Overview</a>
+        <a href="/staff/members" class="staff-nav-link">Members</a>
+        <a href="/staff/analytics" class="staff-nav-link">Analytics</a>
+        <a href="/staff/guardian" class="staff-nav-link">Guardian</a>
+        <a href="/staff/audit" class="staff-nav-link active">Audit Log</a>
+    </div>
+    {% if logs %}
+    <table class="lb-table">
+        <thead><tr><th>Time</th><th>Staff</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+        <tbody>
+            {% for l in logs %}
+            <tr>
+                <td>{{ l.created_at|timeago if l.created_at else '?' }}</td>
+                <td>{{ l.staff_name or l.staff_id }}</td>
+                <td><span class="audit-action">{{ l.action }}</span></td>
+                <td>{% if l.target_id %}<a href="/staff/member/{{ l.target_id }}">{{ l.target_id }}</a>{% else %}—{% endif %}</td>
+                <td class="td-reason">{{ (l.details or '')[:80] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="empty-text">No audit entries yet.</p>{% endif %}
+</section>
+{% endblock %}
