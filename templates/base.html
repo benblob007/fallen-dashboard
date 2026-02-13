@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}The Fallen{% endblock %} — ✝ THE FALLEN ✝</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-inner">
+            <a href="/" class="nav-brand">
+                <img src="/static/logo.svg" alt="" class="nav-logo-img">
+                <span class="brand-text">THE FALLEN</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">Home</a>
+                <a href="/leaderboard" class="nav-link {% if 'leaderboard' in request.url.path %}active{% endif %}">Leaderboard</a>
+                <a href="/raids" class="nav-link {% if request.url.path == '/raids' %}active{% endif %}">Raids</a>
+                <a href="/duels" class="nav-link {% if request.url.path == '/duels' %}active{% endif %}">Duels</a>
+                <a href="/economy" class="nav-link {% if request.url.path == '/economy' %}active{% endif %}">Economy</a>
+                <a href="/analytics" class="nav-link {% if request.url.path == '/analytics' %}active{% endif %}">Analytics</a>
+                <a href="/clan" class="nav-link {% if request.url.path == '/clan' %}active{% endif %}">Clan</a>
+                {% if is_staff %}
+                <a href="/staff" class="nav-link staff-link {% if '/staff' in request.url.path %}active{% endif %}">🛡️ Staff</a>
+                {% endif %}
+            </div>
+            <div class="nav-auth">
+                {% if user %}
+                <div class="user-pill">
+                    <img src="{{ user.avatar }}" alt="" class="user-avatar">
+                    <span class="user-name">{{ user.username }}</span>
+                    <div class="user-dropdown">
+                        <a href="/profile">My Profile</a>
+                        <a href="/apply">Apply</a>
+                        <a href="/auth/debug">Auth Debug</a>
+                        <hr>
+                        <a href="/auth/logout" class="logout-link">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="/auth/login" class="btn btn-login">Login with Discord</a>
+                {% endif %}
+            </div>
+            <button class="nav-hamburger" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+        </div>
+    </nav>
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <div class="footer-inner">
+            <img src="/static/logo.svg" alt="" class="footer-logo">
+            <span class="footer-brand">✝ THE FALLEN ✝</span>
+            <span class="footer-sep">—</span>
+            <span class="footer-text">Gaming Clan Dashboard</span>
+        </div>
+    </footer>
+</body>
+</html>
