@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Economy{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">💰 Economy</h2>
+
+    <div class="stat-grid compact">
+        <div class="stat-card"><div class="stat-value">{{ (eco.total_coins_circulation or 0)|fnum }}</div><div class="stat-label">Total FCoins</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (eco.avg_coins or 0)|fnum }}</div><div class="stat-label">Avg Per Player</div></div>
+    </div>
+
+    <div class="raids-two-col">
+        <div class="raid-section-card">
+            <h3>👑 Richest Members</h3>
+            <table class="mini-table">
+                <thead><tr><th>#</th><th>Player</th><th>Coins</th><th>Level</th></tr></thead>
+                <tbody>
+                    {% for r in eco.richest %}
+                    <tr>
+                        <td>{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</td>
+                        <td>{{ r.name }}</td>
+                        <td><strong>{{ r.coins|fnum }}</strong></td>
+                        <td>{{ r.level or 0 }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not eco.richest %}<tr><td colspan="4" class="td-empty">No data.</td></tr>{% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="raid-section-card">
+            <h3>🛒 Shop Catalog</h3>
+            <div class="shop-grid">
+                {% for item in shop %}
+                <div class="shop-item">
+                    <div class="shop-item-name">{{ item.name }}</div>
+                    <div class="shop-item-meta">
+                        <span class="shop-price">{{ item.price|fnum }} FC</span>
+                        <span class="shop-type">{{ item.type }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not shop %}<p class="empty-text">No items.</p>{% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
