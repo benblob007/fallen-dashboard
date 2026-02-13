@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Raids & Wars{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">🔥 Raids & Wars</h2>
+    {% if war_record and war_record.total > 0 %}
+    <div class="war-banner">
+        <div class="war-banner-title">Clan War Record</div>
+        <div class="war-record-stats">
+            <div class="war-stat win"><span class="war-stat-num">{{ war_record.wins }}</span><span class="war-stat-lbl">Wins</span></div>
+            <div class="war-stat draw"><span class="war-stat-num">{{ war_record.draws }}</span><span class="war-stat-lbl">Draws</span></div>
+            <div class="war-stat loss"><span class="war-stat-num">{{ war_record.losses }}</span><span class="war-stat-lbl">Losses</span></div>
+        </div>
+        {% set total = war_record.total or 1 %}
+        <div class="war-record-bar">
+            <div class="war-wins" style="width:{{ (war_record.wins/total*100)|int }}%"></div>
+            {% if war_record.draws %}<div class="war-draws" style="width:{{ (war_record.draws/total*100)|int }}%"></div>{% endif %}
+            <div class="war-losses" style="width:{{ (war_record.losses/total*100)|int }}%"></div>
+        </div>
+    </div>
+    {% endif %}
+    <div class="raids-two-col">
+        <div class="raid-section-card">
+            <h3>🏆 Top Raiders</h3>
+            {% if raid_leaders %}
+            <table class="mini-table"><thead><tr><th>#</th><th>Raids</th><th>Won</th><th>MVP</th><th>XP</th></tr></thead>
+            <tbody>{% for r in raid_leaders %}<tr><td>{{ loop.index }}</td><td><strong>{{ r.raids_participated or 0 }}</strong></td><td class="wins">{{ r.raids_won or 0 }}</td><td>{{ r.mvp_count or 0 }}</td><td>{{ (r.total_xp_earned or 0)|fnum }}</td></tr>{% endfor %}</tbody></table>
+            {% else %}<p class="empty-text">No raid data yet.</p>{% endif %}
+        </div>
+        <div class="raid-section-card">
+            <h3>🏴 Recent Wars</h3>
+            {% if recent_wars %}
+            <div class="war-list">{% for w in recent_wars %}<div class="war-item {{ w.status or '' }}"><div class="war-opponent">vs {{ w.opponent_clan or 'Unknown' }}</div><div class="war-score">{{ w.our_score or 0 }}-{{ w.their_score or 0 }}</div><div class="war-status-badge">{{ (w.status or 'pending')|upper }}</div></div>{% endfor %}</div>
+            {% else %}<p class="empty-text">No wars yet.</p>{% endif %}
+        </div>
+    </div>
+    <div class="raid-section-card full-width">
+        <h3>⚡ Recent Raids</h3>
+        {% if recent_raids %}
+        <div class="raid-feed">{% for r in recent_raids %}<div class="raid-item {{ r.status or '' }}"><div class="raid-type-badge">{{ (r.raid_type or 'RAID')|upper }}</div><div class="raid-details">{% if r.target %}<span>vs {{ r.target }}</span>{% endif %}<span>{{ r.our_score or '?' }}-{{ r.their_score or '?' }}</span></div><div class="raid-meta">{{ r.participant_count or 0 }} joined</div><div class="raid-status {{ r.status or '' }}">{{ (r.status or '?')|upper }}</div></div>{% endfor %}</div>
+        {% else %}<p class="empty-text">No raids yet.</p>{% endif %}
+    </div>
+</section>
+{% endblock %}
