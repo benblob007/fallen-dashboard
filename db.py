@@ -1,6 +1,7 @@
 """
-✝ THE FALLEN ✝ — Dashboard Database (v2 Complete)
+✝ THE FALLEN ✝ — Dashboard Database (v3)
 All data sources: main_data, duels_data, warnings_data + enhanced DB tables.
+Auto-role config, staff management, avatar cache.
 """
 
 import os, json, asyncpg, datetime
@@ -32,17 +33,18 @@ class DashboardDB:
             server_settings={"application_name": "FallenDashboard"}
         )
         async with self.pool.acquire() as conn:
-            await conn.execute('''
-                CREATE TABLE IF NOT EXISTS dashboard_audit_log (
-                    id SERIAL PRIMARY KEY,
-                    staff_id BIGINT NOT NULL,
-                    staff_name TEXT,
-                    action TEXT NOT NULL,
-                    target_id BIGINT,
-                    details TEXT,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            ''')
+            await conn.execute('''CREATE TABLE IF NOT EXISTS dashboard_audit_log (
+                id SERIAL PRIMARY KEY, staff_id BIGINT NOT NULL, staff_name TEXT,
+                action TEXT NOT NULL, target_id BIGINT, details TEXT,
+                created_at TIMESTAMP DEFAULT NOW())''')
+            await conn.execute('''CREATE TABLE IF NOT EXISTS staff_roles (
+                id SERIAL PRIMARY KEY, discord_user_id BIGINT UNIQUE NOT NULL,
+                display_name TEXT DEFAULT '', permission_tier INTEGER DEFAULT 1,
+                added_by BIGINT, created_at TIMESTAMP DEFAULT NOW())''')
+            await conn.execute('''CREATE TABLE IF NOT EXISTS role_config (
+                id SERIAL PRIMARY KEY, discord_role_id BIGINT UNIQUE NOT NULL,
+                role_name TEXT DEFAULT '', permission_tier INTEGER DEFAULT 1,
+                added_by BIGINT, created_at TIMESTAMP DEFAULT NOW())''')
         print("✅ Dashboard DB connected")
 
     async def close(self):
@@ -73,7 +75,6 @@ class DashboardDB:
     async def _users(self) -> Dict[str, Dict]:
         return (await self._main()).get("users", {})
 
-    # ── Safe query helpers ─────────────────────────
     async def _qall(self, query: str, *args) -> List[Dict]:
         try:
             async with self.pool.acquire() as conn:
@@ -89,9 +90,30 @@ class DashboardDB:
         except:
             return None
 
-    # ── Roster / Stage ─────────────────────────────
+    # ── Avatar helper ──────────────────────────────
+    def get_avatar_url(self, user: Dict) -> str:
+        if user.get("avatar_url"):
+            return user["avatar_url"]
+        uid = user.get("user_id", 0)
+        return f"https://cdn.discordapp.com/embed/avatars/{int(uid) % 5}.png"
+
+    # ── Roster ─────────────────────────────────────
     async def get_roster(self) -> List:
         return (await self._main()).get("roster", [None] * 10)
+
+    async def get_roster_with_names(self) -> List[Dict]:
+        roster = await self.get_roster()
+        users = await self._users()
+        result = []
+        for i, slot in enumerate(roster if roster else [None]*10):
+            if slot is not None:
+                uid = str(slot)
+                u = users.get(uid, {})
+                name = u.get("roblox_username") or u.get("username") or f"User {uid}"
+                result.append({"slot": i+1, "user_id": uid, "name": name, "filled": True})
+            else:
+                result.append({"slot": i+1, "user_id": None, "name": None, "filled": False})
+        return result
 
     async def get_stage_rank(self, uid: int) -> Optional[int]:
         for i, slot in enumerate(await self.get_roster()):
@@ -106,16 +128,13 @@ class DashboardDB:
         if not u:
             return None
         u["user_id"] = user_id
-        # ELO
         duels = await self._duels()
         u["elo_rating"] = duels.get("elo", {}).get(str(user_id), 1000)
-        # Warnings
         wu = (await self._warnings()).get("users", {}).get(str(user_id), {})
         u["warnings"] = wu.get("warnings", [])
         u["warning_points"] = wu.get("total_points", 0)
-        # Stage
         u["stage_rank"] = await self.get_stage_rank(user_id)
-        # Inventory enriched
+        u["avatar_url"] = self.get_avatar_url(u)
         u["inventory_items"] = [
             {"id": iid, **(SHOP_ITEMS.get(iid, {"name": iid, "price": 0, "type": "unknown"}))}
             for iid in (u.get("inventory") or [])
@@ -131,17 +150,11 @@ class DashboardDB:
             sort_by = "xp"
         users = await self._users()
         elo_map = (await self._duels()).get("elo", {})
-        roster = (await self._main()).get("roster", [])
         lst = []
         for uid, u in users.items():
             u["user_id"] = int(uid)
             u["elo_rating"] = elo_map.get(uid, 1000)
-            stage = None
-            for i, slot in enumerate(roster):
-                if slot is not None and str(slot) == uid:
-                    stage = i + 1
-                    break
-            u["stage_rank"] = stage
+            u["avatar_url"] = self.get_avatar_url(u)
             lst.append(u)
         lst.sort(key=lambda x: x.get(sort_by, 0) or 0, reverse=True)
         return lst[offset:offset + limit]
@@ -149,8 +162,7 @@ class DashboardDB:
     async def get_user_rank(self, user_id: int, sort_by: str = "xp") -> int:
         users = await self._users()
         uid = str(user_id)
-        if uid not in users:
-            return 0
+        if uid not in users: return 0
         if sort_by == "elo_rating":
             elo = (await self._duels()).get("elo", {})
             val = elo.get(uid, 1000)
@@ -168,9 +180,9 @@ class DashboardDB:
             if q in name.lower() or q in uid:
                 u["user_id"] = int(uid)
                 u["elo_rating"] = elo_map.get(uid, 1000)
+                u["avatar_url"] = self.get_avatar_url(u)
                 results.append(u)
-                if len(results) >= limit:
-                    break
+                if len(results) >= limit: break
         results.sort(key=lambda x: x.get("xp", 0) or 0, reverse=True)
         return results
 
@@ -224,9 +236,7 @@ class DashboardDB:
         now = datetime.datetime.now(datetime.timezone.utc)
         level_dist = Counter()
         activity = {"24h": 0, "7d": 0, "30d": 0, "inactive": 0}
-        msg_total = voice_total = verified_count = 0
-        level_sum = 0
-
+        msg_total = voice_total = verified_count = level_sum = 0
         for u in users.values():
             lvl = u.get("level", 0) or 0
             bucket = f"{(lvl // 10) * 10}-{(lvl // 10) * 10 + 9}"
@@ -234,44 +244,30 @@ class DashboardDB:
             level_sum += lvl
             msg_total += u.get("messages", 0) or 0
             voice_total += u.get("voice_time", 0) or 0
-            if u.get("verified"):
-                verified_count += 1
+            if u.get("verified"): verified_count += 1
             la = u.get("last_active")
             if la:
                 try:
-                    if isinstance(la, str):
-                        la = datetime.datetime.fromisoformat(la.replace("Z", "+00:00"))
-                    if la.tzinfo is None:
-                        la = la.replace(tzinfo=datetime.timezone.utc)
+                    if isinstance(la, str): la = datetime.datetime.fromisoformat(la.replace("Z", "+00:00"))
+                    if la.tzinfo is None: la = la.replace(tzinfo=datetime.timezone.utc)
                     days = (now - la).total_seconds() / 86400
                     if days < 1: activity["24h"] += 1
                     elif days < 7: activity["7d"] += 1
                     elif days < 30: activity["30d"] += 1
                     else: activity["inactive"] += 1
-                except:
-                    activity["inactive"] += 1
-            else:
-                activity["inactive"] += 1
-
-        # Top 5 in each category
+                except: activity["inactive"] += 1
+            else: activity["inactive"] += 1
         def top5(key):
             s = sorted(users.items(), key=lambda x: x[1].get(key, 0) or 0, reverse=True)[:5]
-            return [{"name": u.get("roblox_username", "Unknown"), "value": u.get(key, 0) or 0}
-                    for _, u in s]
-
+            return [{"name": u.get("roblox_username", "Unknown"), "value": u.get(key, 0) or 0} for _, u in s]
         return {
-            "total_users": len(users),
-            "verified_count": verified_count,
+            "total_users": len(users), "verified_count": verified_count,
             "avg_level": level_sum // max(len(users), 1),
             "level_distribution": dict(sorted(level_dist.items())),
-            "activity_breakdown": activity,
-            "total_messages": msg_total,
-            "total_voice_seconds": voice_total,
-            "top_xp": top5("xp"),
-            "top_messages": top5("messages"),
-            "top_voice": top5("voice_time"),
-            "top_raiders": top5("raid_participation"),
-            "top_duelers": top5("wins"),
+            "activity_breakdown": activity, "total_messages": msg_total,
+            "total_voice_seconds": voice_total, "top_xp": top5("xp"),
+            "top_messages": top5("messages"), "top_voice": top5("voice_time"),
+            "top_raiders": top5("raid_participation"), "top_duelers": top5("wins"),
             "elo_distribution": await self.get_elo_distribution(),
         }
 
@@ -281,8 +277,7 @@ class DashboardDB:
         empty = {"total_users": 0, "verified_users": 0, "total_xp": 0, "total_coins": 0,
                  "total_messages": 0, "avg_level": 0, "max_level": 0, "total_duels": 0,
                  "total_raid_participations": 0, "total_trainings": 0, "active_7d": 0, "active_24h": 0}
-        if not users:
-            return empty
+        if not users: return empty
         now = datetime.datetime.now(datetime.timezone.utc)
         s = dict(empty)
         s["total_users"] = len(users)
@@ -314,14 +309,11 @@ class DashboardDB:
     async def get_recent_warnings(self, limit: int = 50) -> List[Dict]:
         wdata = await self._warnings()
         recent = wdata.get("recent_warnings", [])
-        if recent:
-            return recent[:limit]
+        if recent: return recent[:limit]
         all_w = []
         for uid, info in wdata.get("users", {}).items():
             for w in info.get("warnings", []):
-                w2 = dict(w)
-                w2["user_id"] = int(uid)
-                w2["active"] = not w.get("expired", False)
+                w2 = dict(w); w2["user_id"] = int(uid); w2["active"] = not w.get("expired", False)
                 all_w.append(w2)
         all_w.sort(key=lambda w: w.get("timestamp", ""), reverse=True)
         return all_w[:limit]
@@ -335,7 +327,21 @@ class DashboardDB:
         return await self._qall("SELECT * FROM raid_sessions ORDER BY id DESC LIMIT $1", limit)
 
     async def get_raid_leaderboard(self, limit=20) -> List[Dict]:
-        return await self._qall("SELECT * FROM raid_stats ORDER BY raids_participated DESC LIMIT $1", limit)
+        result = await self._qall("SELECT * FROM raid_stats ORDER BY raids_participated DESC LIMIT $1", limit)
+        if result: return result
+        users = await self._users()
+        raiders = []
+        for uid, u in users.items():
+            rp = u.get("raid_participation", 0) or 0
+            if rp > 0:
+                raiders.append({
+                    "user_id": int(uid), "roblox_username": u.get("roblox_username", "Unknown"),
+                    "raids_participated": rp, "raid_participation": rp,
+                    "raids_won": u.get("raid_wins", 0) or 0, "raid_wins": u.get("raid_wins", 0) or 0,
+                    "mvp_count": u.get("mvp_count", 0) or 0,
+                })
+        raiders.sort(key=lambda x: x["raids_participated"], reverse=True)
+        return raiders[:limit]
 
     async def get_wars(self, limit=10) -> List[Dict]:
         return await self._qall("SELECT * FROM wars ORDER BY id DESC LIMIT $1", limit)
@@ -375,8 +381,7 @@ class DashboardDB:
             return False
 
     # ── Audit Log ──────────────────────────────────
-    async def add_audit(self, staff_id: int, staff_name: str, action: str,
-                        target_id: int = None, details: str = None):
+    async def add_audit(self, staff_id, staff_name, action, target_id=None, details=None):
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(
@@ -386,92 +391,126 @@ class DashboardDB:
             print(f"[AUDIT] {e}")
 
     async def get_audit_log(self, limit=100) -> List[Dict]:
-        return await self._qall(
-            "SELECT * FROM dashboard_audit_log ORDER BY created_at DESC LIMIT $1", limit)
+        return await self._qall("SELECT * FROM dashboard_audit_log ORDER BY created_at DESC LIMIT $1", limit)
 
     # ── Guardian Stats ─────────────────────────
     async def get_guardian_stats(self) -> Dict:
         data = await self._blob("guardian_stats")
-        return data or {
-            "commands_today": 0,
-            "errors_today": 0,
-            "active_abuse_flags": 0,
-            "abuse_scores": {},
-            "top_users_today": [],
-            "restricted_users": [],
-            "updated_at": None,
-        }
+        return data or {"commands_today": 0, "errors_today": 0, "active_abuse_flags": 0,
+                        "abuse_scores": {}, "top_users_today": [], "restricted_users": [], "updated_at": None}
 
     async def get_guardian_audit_events(self, limit=50) -> List[Dict]:
         return await self._qall(
-            "SELECT * FROM dashboard_audit_log WHERE action LIKE 'guardian_%' "
+            "SELECT * FROM dashboard_audit_log WHERE action LIKE 'guardian_%%' "
             "ORDER BY created_at DESC LIMIT $1", limit)
 
-    # ── Pending Actions (Dashboard → Bot) ─────
-    async def queue_action(self, action_type: str, target_user_id: int,
-                           staff_id: int, staff_name: str, params: dict = None) -> int:
-        """Queue an action for the bot to execute."""
+    # ── Pending Actions ────────────────────────
+    async def queue_action(self, action_type, target_user_id, staff_id, staff_name, params=None) -> int:
         try:
             async with self.pool.acquire() as conn:
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS pending_dashboard_actions (
-                        id SERIAL PRIMARY KEY, action_type TEXT NOT NULL,
-                        target_user_id BIGINT NOT NULL, staff_id BIGINT NOT NULL,
-                        staff_name TEXT, params JSONB DEFAULT '{}',
-                        status TEXT DEFAULT 'pending', result TEXT,
-                        created_at TIMESTAMP DEFAULT NOW(), executed_at TIMESTAMP
-                    )""")
+                await conn.execute("""CREATE TABLE IF NOT EXISTS pending_dashboard_actions (
+                    id SERIAL PRIMARY KEY, action_type TEXT NOT NULL,
+                    target_user_id BIGINT NOT NULL, staff_id BIGINT NOT NULL,
+                    staff_name TEXT, params JSONB DEFAULT '{}',
+                    status TEXT DEFAULT 'pending', result TEXT,
+                    created_at TIMESTAMP DEFAULT NOW(), executed_at TIMESTAMP)""")
                 row = await conn.fetchrow(
                     "INSERT INTO pending_dashboard_actions "
                     "(action_type, target_user_id, staff_id, staff_name, params) "
                     "VALUES ($1,$2,$3,$4,$5) RETURNING id",
-                    action_type, target_user_id, staff_id, staff_name,
-                    json.dumps(params or {}))
+                    action_type, target_user_id, staff_id, staff_name, json.dumps(params or {}))
                 return row["id"] if row else 0
         except Exception as e:
             print(f"[QUEUE] {e}")
             return 0
 
     async def get_pending_actions(self, limit=50) -> List[Dict]:
-        return await self._qall(
-            "SELECT * FROM pending_dashboard_actions ORDER BY created_at DESC LIMIT $1", limit)
+        return await self._qall("SELECT * FROM pending_dashboard_actions ORDER BY created_at DESC LIMIT $1", limit)
 
-    async def get_action_history(self, target_id: int = None, limit=30) -> List[Dict]:
+    async def get_action_history(self, target_id=None, limit=30) -> List[Dict]:
         if target_id:
             return await self._qall(
-                "SELECT * FROM pending_dashboard_actions WHERE target_user_id = $1 "
-                "ORDER BY created_at DESC LIMIT $2", target_id, limit)
-        return await self._qall(
-            "SELECT * FROM pending_dashboard_actions ORDER BY created_at DESC LIMIT $1", limit)
+                "SELECT * FROM pending_dashboard_actions WHERE target_user_id = $1 ORDER BY created_at DESC LIMIT $2", target_id, limit)
+        return await self._qall("SELECT * FROM pending_dashboard_actions ORDER BY created_at DESC LIMIT $1", limit)
 
-    # ── Transaction History ────────────────────
-    async def get_transactions(self, user_id: int = None, limit=50) -> List[Dict]:
+    async def get_transactions(self, user_id=None, limit=50) -> List[Dict]:
         try:
             async with self.pool.acquire() as conn:
                 if user_id:
-                    rows = await conn.fetch(
-                        "SELECT * FROM coin_transactions WHERE user_id = $1 "
-                        "ORDER BY created_at DESC LIMIT $2", user_id, limit)
+                    rows = await conn.fetch("SELECT * FROM coin_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2", user_id, limit)
                 else:
-                    rows = await conn.fetch(
-                        "SELECT * FROM coin_transactions ORDER BY created_at DESC LIMIT $1", limit)
+                    rows = await conn.fetch("SELECT * FROM coin_transactions ORDER BY created_at DESC LIMIT $1", limit)
                 return [dict(r) for r in rows]
-        except Exception:
-            return []
+        except: return []
+
+    # ══════════════════════════════════════════════
+    # STAFF ROLE MANAGEMENT
+    # ══════════════════════════════════════════════
+
+    async def get_staff_members(self) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                return [dict(r) for r in await conn.fetch("SELECT * FROM staff_roles ORDER BY permission_tier DESC, created_at ASC")]
+        except: return []
+
+    async def add_staff_member(self, discord_user_id, display_name, permission_tier, added_by):
+        async with self.pool.acquire() as conn:
+            await conn.execute('''INSERT INTO staff_roles (discord_user_id, display_name, permission_tier, added_by)
+                VALUES ($1, $2, $3, $4) ON CONFLICT (discord_user_id) DO UPDATE SET display_name = $2, permission_tier = $3''',
+                discord_user_id, display_name, permission_tier, added_by)
+
+    async def remove_staff_member(self, discord_user_id):
+        async with self.pool.acquire() as conn:
+            await conn.execute("DELETE FROM staff_roles WHERE discord_user_id = $1", discord_user_id)
+
+    async def is_db_staff(self, discord_user_id) -> tuple:
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT permission_tier FROM staff_roles WHERE discord_user_id = $1", discord_user_id)
+                if row: return True, row["permission_tier"]
+                return False, 0
+        except: return False, 0
+
+    # ══════════════════════════════════════════════
+    # AUTO-ROLE CONFIGURATION
+    # ══════════════════════════════════════════════
+
+    async def get_role_configs(self) -> List[Dict]:
+        try:
+            async with self.pool.acquire() as conn:
+                return [dict(r) for r in await conn.fetch("SELECT * FROM role_config ORDER BY permission_tier DESC, created_at ASC")]
+        except: return []
+
+    async def add_role_config(self, discord_role_id, role_name, permission_tier, added_by):
+        async with self.pool.acquire() as conn:
+            await conn.execute('''INSERT INTO role_config (discord_role_id, role_name, permission_tier, added_by)
+                VALUES ($1, $2, $3, $4) ON CONFLICT (discord_role_id) DO UPDATE SET role_name = $2, permission_tier = $3''',
+                discord_role_id, role_name, permission_tier, added_by)
+
+    async def remove_role_config(self, discord_role_id):
+        async with self.pool.acquire() as conn:
+            await conn.execute("DELETE FROM role_config WHERE discord_role_id = $1", discord_role_id)
+
+    async def check_role_permissions(self, role_ids: list) -> tuple:
+        if not role_ids: return False, 0
+        try:
+            async with self.pool.acquire() as conn:
+                role_ids_int = [int(r) for r in role_ids]
+                rows = await conn.fetch("SELECT permission_tier FROM role_config WHERE discord_role_id = ANY($1)", role_ids_int)
+                if rows:
+                    return True, max(r["permission_tier"] for r in rows)
+                return False, 0
+        except Exception as e:
+            print(f"[DB] check_role_permissions: {e}")
+            return False, 0
 
 
-# Warning categories (mirror of bot's WARNING_CATEGORIES)
 WARNING_CATEGORIES = {
-    "spam": {"points": 1, "name": "Spamming"},
-    "arguing": {"points": 2, "name": "Arguing"},
-    "disrespect": {"points": 2, "name": "Disrespect"},
-    "slightnsfw": {"points": 3, "name": "Slight NSFW"},
-    "slightracism": {"points": 3, "name": "Slight Racism"},
-    "nsfw": {"points": 4, "name": "NSFW Content"},
-    "religion": {"points": 4, "name": "Religion Disrespect"},
-    "fighting": {"points": 4, "name": "Fighting After Mute"},
-    "impersonate": {"points": 4, "name": "Impersonating Staff"},
-    "racism": {"points": 4, "name": "Racism"},
+    "spam": {"points": 1, "name": "Spamming"}, "arguing": {"points": 2, "name": "Arguing"},
+    "disrespect": {"points": 2, "name": "Disrespect"}, "slightnsfw": {"points": 3, "name": "Slight NSFW"},
+    "slightracism": {"points": 3, "name": "Slight Racism"}, "nsfw": {"points": 4, "name": "NSFW Content"},
+    "religion": {"points": 4, "name": "Religion Disrespect"}, "fighting": {"points": 4, "name": "Fighting After Mute"},
+    "impersonate": {"points": 4, "name": "Impersonating Staff"}, "racism": {"points": 4, "name": "Racism"},
     "severe": {"points": 5, "name": "Severe Offense"},
     "pedo": {"points": 999, "name": "Pedo Content/Defense", "instant_ban": True},
     "grape": {"points": 999, "name": "SA Jokes/Threats", "instant_ban": True},
@@ -490,6 +529,5 @@ WARNING_CATEGORIES = {
     "alt": {"points": 999, "name": "Alt Account", "instant_ban": True},
     "raid": {"points": 999, "name": "Nuking/Raiding", "instant_ban": True},
 }
-
 
 db = DashboardDB()
