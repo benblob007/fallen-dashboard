@@ -10,23 +10,29 @@
     </div>
     <div class="lb-table-wrap">
         <table class="lb-table">
-            <thead><tr><th>#</th><th>Player</th><th>Stage</th><th>Lvl</th><th>XP</th><th>ELO</th><th>Coins</th><th>W/L</th><th>Raids</th></tr></thead>
+            <thead><tr><th>#</th><th>Player</th><th>Lvl</th><th>XP</th><th>ELO</th><th>Coins</th><th>W/L</th><th>Raids</th></tr></thead>
             <tbody>
                 {% for p in players %}
                 {% set pos = loop.index + offset %}
                 <tr class="{% if pos <= 3 %}top-three{% endif %}">
                     <td class="td-rank">{% if pos == 1 %}🥇{% elif pos == 2 %}🥈{% elif pos == 3 %}🥉{% else %}{{ pos }}{% endif %}</td>
-                    <td class="td-name">{% if p.verified %}<span class="verified-dot">✓</span>{% endif %}{{ p.roblox_username or 'Unknown' }}</td>
-                    <td>{% if p.stage_rank %}<span class="stage-pill">⚔️{{ p.stage_rank }}</span>{% else %}—{% endif %}</td>
+                    <td>
+                        <div class="lb-player-cell">
+                            <img src="{{ p.avatar_url or 'https://cdn.discordapp.com/embed/avatars/' ~ (p.user_id % 5) ~ '.png' }}" alt="" class="lb-avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                            <div>
+                                <div class="lb-player-name">{{ p.roblox_username or 'Unknown' }}</div>
+                            </div>
+                        </div>
+                    </td>
                     <td><span class="level-pill">{{ p.level or 0 }}</span></td>
                     <td>{{ (p.xp or 0)|fnum }}</td>
-                    <td>{% set rn, re, rc = elo_rank(p.elo_rating or 1000) %}<span class="elo-badge" title="{{ rn }}">{{ re }}{{ p.elo_rating or 1000 }}</span></td>
+                    <td>{% set rn, re, rc = elo_rank(p.elo_rating or 1000) %}<span class="elo-badge" style="color:{{ rc }}" title="{{ rn }}">{{ re }}{{ p.elo_rating or 1000 }}</span></td>
                     <td>{{ (p.coins or 0)|fnum }}</td>
-                    <td><span class="wins">{{ p.wins or 0 }}</span>/<span class="losses">{{ p.losses or 0 }}</span></td>
+                    <td><span class="text-green">{{ p.wins or 0 }}</span>/<span class="text-red">{{ p.losses or 0 }}</span></td>
                     <td>{{ p.raid_participation or 0 }}</td>
                 </tr>
                 {% endfor %}
-                {% if not players %}<tr><td colspan="9" class="td-empty">No players found.</td></tr>{% endif %}
+                {% if not players %}<tr><td colspan="8" class="td-empty">No players found.</td></tr>{% endif %}
             </tbody>
         </table>
     </div>
