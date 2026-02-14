@@ -4,60 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}The Fallen{% endblock %} — ✝ THE FALLEN ✝</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="icon" type="image/png" href="/static/fallen-logo.png">
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Brand Guide §7.4 — Watermark -->
+    <img src="/static/fallen-logo.png" alt="" class="watermark" aria-hidden="true">
+
     <nav class="navbar">
-        <div class="nav-inner">
-            <a href="/" class="nav-brand">
-                <img src="/static/logo.svg" alt="" class="nav-logo-img">
-                <span class="brand-text">THE FALLEN</span>
-            </a>
-            <div class="nav-links" id="navLinks">
-                <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">Home</a>
-                <a href="/leaderboard" class="nav-link {% if 'leaderboard' in request.url.path %}active{% endif %}">Leaderboard</a>
-                <a href="/raids" class="nav-link {% if request.url.path == '/raids' %}active{% endif %}">Raids</a>
-                <a href="/duels" class="nav-link {% if request.url.path == '/duels' %}active{% endif %}">Duels</a>
-                <a href="/economy" class="nav-link {% if request.url.path == '/economy' %}active{% endif %}">Economy</a>
-                <a href="/analytics" class="nav-link {% if request.url.path == '/analytics' %}active{% endif %}">Analytics</a>
-                <a href="/clan" class="nav-link {% if request.url.path == '/clan' %}active{% endif %}">Clan</a>
-                {% if is_staff %}
-                <a href="/staff" class="nav-link staff-link {% if '/staff' in request.url.path %}active{% endif %}">🛡️ Staff</a>
-                {% endif %}
-            </div>
-            <div class="nav-auth">
-                {% if user %}
-                <div class="user-pill">
-                    <img src="{{ user.avatar }}" alt="" class="user-avatar">
-                    <span class="user-name">{{ user.username }}</span>
-                    <div class="user-dropdown">
-                        <a href="/profile">My Profile</a>
-                        <a href="/apply">Apply</a>
-                        <a href="/auth/debug">Auth Debug</a>
-                        <hr>
-                        <a href="/auth/logout" class="logout-link">Logout</a>
-                    </div>
-                </div>
-                {% else %}
-                <a href="/auth/login" class="btn btn-login">Login with Discord</a>
-                {% endif %}
-            </div>
-            <button class="nav-hamburger" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+        <!-- Brand Guide §7.2 — Navbar logo: static PNG, 40px, left aligned -->
+        <a href="/" class="nav-brand">
+            <img src="/static/fallen-logo.png" alt="The Fallen">
+            <span>THE FALLEN</span>
+        </a>
+        <div class="nav-links" id="navLinks">
+            <a href="/" {% if request.url.path == '/' %}class="active"{% endif %}>Home</a>
+            <a href="/leaderboard" {% if 'leaderboard' in request.url.path %}class="active"{% endif %}>Leaderboard</a>
+            <a href="/raids" {% if request.url.path == '/raids' %}class="active"{% endif %}>Raids</a>
+            <a href="/duels" {% if request.url.path == '/duels' %}class="active"{% endif %}>Duels</a>
+            <a href="/economy" {% if request.url.path == '/economy' %}class="active"{% endif %}>Economy</a>
+            <a href="/analytics" {% if request.url.path == '/analytics' %}class="active"{% endif %}>Analytics</a>
+            <a href="/clan" {% if request.url.path == '/clan' %}class="active"{% endif %}>Clan</a>
+            {% if is_staff %}
+            <a href="/staff" {% if '/staff' in request.url.path %}class="active"{% endif %} style="color:#FF2A2A">🛡️ Staff</a>
+            {% endif %}
         </div>
+        <div class="nav-auth" id="navAuth">
+            {% if user %}
+            <a href="/profile" class="nav-user"><strong>{{ user.username }}</strong></a>
+            <a href="/auth/logout" style="color:var(--text-muted);font-size:12px">Logout</a>
+            {% else %}
+            <a href="/auth/login" class="login-btn">Login with Discord</a>
+            {% endif %}
+        </div>
+        <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open');document.getElementById('navAuth').classList.toggle('open')">☰</button>
     </nav>
-    <main class="main-content">
+
+    <main>
         {% block content %}{% endblock %}
     </main>
+
     <footer class="footer">
-        <div class="footer-inner">
-            <img src="/static/logo.svg" alt="" class="footer-logo">
-            <span class="footer-brand">✝ THE FALLEN ✝</span>
-            <span class="footer-sep">—</span>
-            <span class="footer-text">Gaming Clan Dashboard</span>
-        </div>
+        <img src="/static/fallen-logo.png" alt="" style="height:28px;width:auto;display:inline-block;vertical-align:middle;border-radius:4px;margin-right:8px;opacity:0.7">
+        ✝ THE FALLEN ✝ — Gaming Clan Dashboard
     </footer>
 </body>
 </html>
