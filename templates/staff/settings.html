@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Staff Settings{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">⚙️ Staff Settings</h2>
+    <div class="staff-nav">
+        <a href="/staff" class="staff-nav-link">Overview</a>
+        <a href="/staff/members" class="staff-nav-link">Members</a>
+        <a href="/staff/analytics" class="staff-nav-link">Analytics</a>
+        <a href="/staff/guardian" class="staff-nav-link">Guardian</a>
+        <a href="/staff/audit" class="staff-nav-link">Audit Log</a>
+        <a href="/staff/settings" class="staff-nav-link active">⚙️ Settings</a>
+    </div>
+
+    {% if success %}
+    <div class="success-banner">
+        ✅ {% if 'staff_added' in success %}Staff member added. They need to log out and back in to get access.
+        {% elif 'staff_removed' in success %}Staff member removed.
+        {% elif 'role_added' in success %}Auto-role configuration saved. Users with this role will automatically get dashboard access on next login.
+        {% elif 'role_removed' in success %}Role mapping removed.
+        {% else %}{{ success }}{% endif %}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="warn-banner critical">
+        ❌ {% if error == 'invalid_id' %}Invalid Discord user ID. Must be a number like 738127180701106209
+        {% elif error == 'invalid_role_id' %}Invalid Discord role ID. Must be a number.
+        {% elif error == 'db_error' %}Database error. Please try again.
+        {% else %}{{ error }}{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SECTION 1: Manual Staff Management          -->
+    <!-- ═══════════════════════════════════════════ -->
+
+    <h3 class="settings-section-title">👤 Manual Staff Management</h3>
+    <p class="settings-desc">Add individual users by pasting their Discord user ID. They get dashboard access regardless of their Discord roles.</p>
+
+    <div class="settings-grid">
+        <div class="settings-card">
+            <h4>➕ Add Staff Member</h4>
+            <form action="/staff/settings/add_staff" method="post">
+                <div class="form-group">
+                    <label>Discord User ID</label>
+                    <input type="text" name="discord_id" placeholder="e.g. 738127180701106209" required pattern="[0-9]+" title="Must be a number">
+                </div>
+                <div class="form-group">
+                    <label>Display Name (optional)</label>
+                    <input type="text" name="display_name" placeholder="e.g. Tsuki" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>Permission Tier</label>
+                    <select name="permission_tier">
+                        <option value="1">Tier 1 — Moderator</option>
+                        <option value="2">Tier 2 — Admin</option>
+                        <option value="3">Tier 3 — Owner</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Add Staff</button>
+            </form>
+        </div>
+
+        <div class="settings-card">
+            <h4>👥 Current Staff (Manual)</h4>
+            {% if staff_members %}
+            {% for s in staff_members %}
+            <div class="settings-row">
+                <div>
+                    <span class="settings-row-name">{{ s.display_name or 'Unknown' }}</span>
+                    <span class="settings-row-id">{{ s.discord_user_id }}</span>
+                </div>
+                <div class="settings-row-actions">
+                    <span class="tier-badge tier-{{ s.permission_tier }}">Tier {{ s.permission_tier }}</span>
+                    <form action="/staff/settings/remove_staff/{{ s.discord_user_id }}" method="post" style="margin:0" onsubmit="return confirm('Remove this staff member?')">
+                        <button type="submit" class="btn-tiny btn-danger" title="Remove">✕</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-muted" style="padding:16px 0;font-size:13px">No staff members added manually. Add one above.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SECTION 2: Auto-Role Configuration          -->
+    <!-- ═══════════════════════════════════════════ -->
+
+    <h3 class="settings-section-title" style="margin-top:32px">🔄 Auto-Role Configuration</h3>
+    <p class="settings-desc">Map Discord roles to permission tiers. Anyone with a matching role automatically gets dashboard access at the specified tier — no manual adding needed.</p>
+
+    <div class="settings-grid">
+        <div class="settings-card">
+            <h4>➕ Add Role Mapping</h4>
+            <form action="/staff/settings/add_role" method="post">
+                <div class="form-group">
+                    <label>Discord Role ID</label>
+                    <input type="text" name="role_id" placeholder="e.g. 1234567890123456789" required pattern="[0-9]+" title="Must be a number">
+                </div>
+                <div class="form-group">
+                    <label>Role Name (for display)</label>
+                    <input type="text" name="role_name" placeholder="e.g. Staff, Admin, Head Mod" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>Permission Tier</label>
+                    <select name="permission_tier">
+                        <option value="1">Tier 1 — Moderator</option>
+                        <option value="2">Tier 2 — Admin</option>
+                        <option value="3">Tier 3 — Owner</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Add Role Mapping</button>
+            </form>
+        </div>
+
+        <div class="settings-card">
+            <h4>🔗 Current Role Mappings</h4>
+            {% if role_configs %}
+            {% for rc in role_configs %}
+            <div class="settings-row">
+                <div>
+                    <span class="settings-row-name">{{ rc.role_name or 'Unknown Role' }}</span>
+                    <span class="settings-row-id">{{ rc.discord_role_id }}</span>
+                </div>
+                <div class="settings-row-actions">
+                    <span class="tier-badge tier-{{ rc.permission_tier }}">Tier {{ rc.permission_tier }}</span>
+                    <form action="/staff/settings/remove_role/{{ rc.discord_role_id }}" method="post" style="margin:0" onsubmit="return confirm('Remove this role mapping?')">
+                        <button type="submit" class="btn-tiny btn-danger" title="Remove">✕</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-muted" style="padding:16px 0;font-size:13px">No role mappings configured. Add one to enable automatic staff access based on Discord roles.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SECTION 3: How-To + Permission Guide        -->
+    <!-- ═══════════════════════════════════════════ -->
+
+    <div class="settings-grid" style="margin-top:16px">
+        <div class="settings-card">
+            <h4>💡 How to Get IDs</h4>
+            <table class="profile-table">
+                <tr><td>1.</td><td>Open Discord → Settings → Advanced → Enable Developer Mode</td></tr>
+                <tr><td>2.</td><td>Right-click a <strong>user</strong> → Copy User ID</td></tr>
+                <tr><td>3.</td><td>Right-click a <strong>role</strong> (in server settings) → Copy Role ID</td></tr>
+            </table>
+            <p class="text-muted" style="margin-top:12px;font-size:12px">Or visit <a href="/auth/debug" style="color:var(--red)">/auth/debug</a> after logging in to see your own roles and IDs.</p>
+        </div>
+
+        <div class="settings-card">
+            <h4>🔑 Permission Tiers</h4>
+            <div class="tier-guide">
+                <div class="tier-guide-row">
+                    <span class="tier-badge tier-1">Tier 1</span>
+                    <span>Moderator — View members, warnings, timeouts, logs</span>
+                </div>
+                <div class="tier-guide-row">
+                    <span class="tier-badge tier-2">Tier 2</span>
+                    <span>Admin — All Tier 1 + economy, XP, raids, kick</span>
+                </div>
+                <div class="tier-guide-row">
+                    <span class="tier-badge tier-3">Tier 3</span>
+                    <span>Owner — Full access + settings, ban, system controls</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Environment Config (read-only) -->
+    <div class="settings-card" style="margin-top:16px">
+        <h4>🔧 Environment Variables (read-only)</h4>
+        <p class="text-muted" style="font-size:12px;margin-bottom:8px">Set in Render's environment tab. These work in addition to the database configs above.</p>
+        <table class="profile-table">
+            <tr><td>STAFF_ROLE_IDS</td><td class="text-right"><code>{{ staff_role_ids_display or 'Not set' }}</code></td></tr>
+            <tr><td>ADMIN_USER_IDS</td><td class="text-right"><code>{{ admin_ids_display or 'Not set' }}</code></td></tr>
+            <tr><td>GUILD_ID</td><td class="text-right"><code>{{ guild_id_display or 'Not set' }}</code></td></tr>
+        </table>
+    </div>
+</section>
+{% endblock %}
