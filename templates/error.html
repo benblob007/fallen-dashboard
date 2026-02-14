@@ -1,40 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Apply{% endblock %}
+{% block title %}{{ error_code }} Error{% endblock %}
 {% block content %}
 <section class="section">
-    <h2 class="section-title">📋 Apply to The Fallen</h2>
-
-    {% if request.query_params.get('submitted') %}
-    <div class="success-banner"><span>✅</span> Application submitted! Staff will review it soon.</div>
-    {% endif %}
-
-    {% if my_apps %}
-    <div class="profile-section-card full-width" style="margin-bottom:20px">
-        <h3>My Applications</h3>
-        {% for a in my_apps %}
-        <div class="app-row"><span>{{ a.position_title or a.position_id }}</span><span class="app-status status-{{ a.status }}">{{ a.status|title }}</span></div>
-        {% endfor %}
+    <div class="error-page">
+        <div class="error-code">{{ error_code }}</div>
+        <h1 class="error-title">{{ error_title }}</h1>
+        <p class="error-msg">{{ error_msg }}</p>
+        <a href="/" class="btn">← Return Home</a>
     </div>
-    {% endif %}
-
-    {% if positions %}
-    <div class="profile-section-card full-width">
-        <h3>Open Positions</h3>
-        {% for p in positions %}
-        <div class="apply-position">
-            <h4>{{ p.title }}</h4>
-            {% if p.description %}<p class="apply-desc">{{ p.description }}</p>{% endif %}
-            <form action="/apply/submit" method="post" class="apply-form">
-                <input type="hidden" name="position_id" value="{{ p.id }}">
-                <label>Why are you interested? Tell us about yourself:</label>
-                <textarea name="answers" rows="4" required placeholder="Write your application here..."></textarea>
-                <button type="submit" class="btn">Submit Application</button>
-            </form>
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="empty-state"><h3>No Open Positions</h3><p>Check back later for new recruitment openings.</p></div>
-    {% endif %}
 </section>
 {% endblock %}
