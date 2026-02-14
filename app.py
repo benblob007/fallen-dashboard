@@ -1,6 +1,6 @@
 """
-✝ THE FALLEN ✝ — Web Dashboard (v2 Complete)
-Full-featured dashboard with all public pages, user pages, staff tools, analytics.
+✝ THE FALLEN ✝ — Web Dashboard (v3)
+Full-featured dashboard with auto-role config, staff management, moderation panel.
 """
 
 import os, time
@@ -171,23 +171,51 @@ async def callback(request: Request, code: str = None, error: str = None):
         if member:
             role_ids = member.get("roles", [])
             nick = member.get("nick")
+
+    # Check staff status from multiple sources
     is_staff = auth.check_is_staff(uid_int, role_ids)
+    permission_tier = 0
+
+    # 1. Admin override (env var)
+    if uid_int in auth.get_admin_user_ids():
+        is_staff = True
+        permission_tier = 3
+
+    # 2. Check database staff_roles table (manual adds)
+    db_is_staff, db_tier = await db.is_db_staff(uid_int)
+    if db_is_staff:
+        is_staff = True
+        permission_tier = max(permission_tier, db_tier)
+
+    # 3. Check role_config table (auto-role mapping)
+    role_is_staff, role_tier = await db.check_role_permissions(role_ids)
+    if role_is_staff:
+        is_staff = True
+        permission_tier = max(permission_tier, role_tier)
+
+    # 4. Env var STAFF_ROLE_IDS fallback
+    if not is_staff and auth.check_is_staff(uid_int, role_ids):
+        is_staff = True
+        permission_tier = max(permission_tier, 2)
+
     avatar_hash = discord_user.get("avatar")
     avatar_url = (f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128"
                   if avatar_hash else f"https://cdn.discordapp.com/embed/avatars/{uid_int % 5}.png")
+
     session = {
         "id": uid_int,
         "username": nick or discord_user.get("global_name") or discord_user.get("username", "Unknown"),
         "discord_username": discord_user.get("username", "Unknown"),
         "avatar": avatar_url,
         "is_staff": is_staff,
+        "permission_tier": permission_tier,
         "role_ids": role_ids,
     }
     db_user = await db.get_user(uid_int)
     if db_user:
         session["level"] = db_user.get("level", 0)
         session["roblox_username"] = db_user.get("roblox_username")
-    print(f"[AUTH] ✅ {session['username']} logged in (staff={is_staff}, roles={len(role_ids)})")
+    print(f"[AUTH] ✅ {session['username']} logged in (staff={is_staff}, tier={permission_tier}, roles={len(role_ids)})")
     response = RedirectResponse("/profile")
     auth.set_session(response, session)
     return response
@@ -202,6 +230,8 @@ async def logout():
 async def auth_debug(request: Request):
     c = _ctx(request)
     c["session"] = auth.get_session(request)
+    c["role_configs"] = await db.get_role_configs()
+    c["staff_members"] = await db.get_staff_members()
     c["config"] = {
         "GUILD_ID": os.getenv("GUILD_ID", "NOT SET"),
         "STAFF_ROLE_IDS": os.getenv("STAFF_ROLE_IDS", "NOT SET"),
@@ -292,7 +322,7 @@ async def clan(request: Request):
     try:
         c["stats"] = await db.get_server_stats()
         c["war_record"] = await db.get_war_record()
-        c["roster"] = await db.get_roster()
+        c["roster"] = await db.get_roster_with_names()
         c["positions"] = await db.get_open_positions()
     except Exception as e:
         print(f"[CLAN] {e}")
@@ -393,22 +423,6 @@ async def staff_member_detail(request: Request, user_id: int):
         c["warn_data"] = await db.get_user_warnings(user_id)
         c["duel_history"] = await db.get_user_duel_history(user_id, 20)
         c["applications"] = await db.get_user_applications(user_id)
-    except Exception as e:
-        print(f"[STAFF-MEMBER] {e}")
-        c.update(member=None, warn_data={"warnings":[],"total_points":0}, duel_history=[], applications=[])
-    await db.add_audit(c["user"]["id"], c["user"].get("username","?"),
-                      "viewed_member", target_id=user_id)
-    return templates.TemplateResponse("staff/member_detail.html", c)
-
-@app.get("/staff/member/{user_id}", response_class=HTMLResponse)
-async def staff_member_detail(request: Request, user_id: int):
-    c = _ctx(request)
-    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
-    try:
-        c["member"] = await db.get_user(user_id)
-        c["warn_data"] = await db.get_user_warnings(user_id)
-        c["duel_history"] = await db.get_user_duel_history(user_id, 20)
-        c["applications"] = await db.get_user_applications(user_id)
         c["warn_categories"] = WARNING_CATEGORIES
         c["transactions"] = await db.get_transactions(user_id, 20)
         c["action_history"] = await db.get_action_history(user_id, 15)
@@ -448,6 +462,32 @@ async def staff_action_timeout(request: Request, user_id: int,
     await db.add_audit(staff["id"], staff.get("username","?"), "queued_timeout",
                       target_id=user_id, details=f"{duration}m: {reason[:100]}")
     return RedirectResponse(f"/staff/member/{user_id}?success=timeout_queued", status_code=303)
+
+@app.post("/staff/action/kick/{user_id}")
+async def staff_action_kick(request: Request, user_id: int, reason: str = Form("")):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    if (staff.get("permission_tier", 0) or 0) < 2:
+        return RedirectResponse(f"/staff/member/{user_id}?error=insufficient_permissions", status_code=303)
+    await db.queue_action("kick", user_id, staff["id"], staff.get("username","?"),
+                          {"reason": reason})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_kick",
+                      target_id=user_id, details=reason[:200])
+    return RedirectResponse(f"/staff/member/{user_id}?success=kick_queued", status_code=303)
+
+@app.post("/staff/action/ban/{user_id}")
+async def staff_action_ban(request: Request, user_id: int, reason: str = Form("")):
+    c = _ctx(request)
+    if _require_staff(c): return RedirectResponse("/?error=unauthorized")
+    staff = c["user"]
+    if (staff.get("permission_tier", 0) or 0) < 3:
+        return RedirectResponse(f"/staff/member/{user_id}?error=insufficient_permissions", status_code=303)
+    await db.queue_action("ban", user_id, staff["id"], staff.get("username","?"),
+                          {"reason": reason})
+    await db.add_audit(staff["id"], staff.get("username","?"), "queued_ban",
+                      target_id=user_id, details=reason[:200])
+    return RedirectResponse(f"/staff/member/{user_id}?success=ban_queued", status_code=303)
 
 @app.post("/staff/action/adjust_xp/{user_id}")
 async def staff_action_xp(request: Request, user_id: int, amount: int = Form(...)):
@@ -531,3 +571,100 @@ async def staff_guardian(request: Request):
         c.update(guardian={}, guardian_events=[])
     await db.add_audit(c["user"]["id"], c["user"].get("username","?"), "viewed_guardian")
     return templates.TemplateResponse("staff/guardian.html", c)
+
+
+# ══════════════════════════════════════════════════════════
+# STAFF SETTINGS — Staff management + Auto-role config
+# ══════════════════════════════════════════════════════════
+
+@app.get("/staff/settings", response_class=HTMLResponse)
+async def staff_settings(request: Request):
+    c = _ctx(request)
+    if _require_staff(c):
+        return RedirectResponse("/?error=unauthorized")
+    try:
+        c["staff_members"] = await db.get_staff_members()
+        c["role_configs"] = await db.get_role_configs()
+        c["success"] = request.query_params.get("success")
+        c["error"] = request.query_params.get("error")
+        c["staff_role_ids_display"] = os.getenv("STAFF_ROLE_IDS", "")
+        c["admin_ids_display"] = os.getenv("ADMIN_USER_IDS", "")
+        c["guild_id_display"] = os.getenv("GUILD_ID", "")
+    except Exception as e:
+        print(f"[SETTINGS] {e}")
+        c.update(staff_members=[], role_configs=[])
+    return templates.TemplateResponse("staff/settings.html", c)
+
+
+@app.post("/staff/settings/add_staff")
+async def add_staff(request: Request):
+    c = _ctx(request)
+    if _require_staff(c):
+        return RedirectResponse("/?error=unauthorized")
+    form = await request.form()
+    discord_id = form.get("discord_id", "").strip()
+    display_name = form.get("display_name", "").strip()
+    tier = int(form.get("permission_tier", 1))
+    if not discord_id.isdigit():
+        return RedirectResponse("/staff/settings?error=invalid_id", status_code=303)
+    if tier not in (1, 2, 3):
+        tier = 1
+    try:
+        await db.add_staff_member(int(discord_id), display_name or f"User {discord_id}", tier, c["user"]["id"])
+        await db.add_audit(c["user"]["id"], c["user"].get("username", "?"), "add_staff",
+                           target_id=int(discord_id), details=f"tier={tier} name={display_name}")
+    except Exception as e:
+        print(f"[SETTINGS] Add staff error: {e}")
+        return RedirectResponse("/staff/settings?error=db_error", status_code=303)
+    return RedirectResponse(f"/staff/settings?success=staff_added", status_code=303)
+
+
+@app.post("/staff/settings/remove_staff/{user_id}")
+async def remove_staff(request: Request, user_id: int):
+    c = _ctx(request)
+    if _require_staff(c):
+        return RedirectResponse("/?error=unauthorized")
+    try:
+        await db.remove_staff_member(user_id)
+        await db.add_audit(c["user"]["id"], c["user"].get("username", "?"), "remove_staff",
+                           target_id=user_id)
+    except Exception as e:
+        print(f"[SETTINGS] Remove staff error: {e}")
+    return RedirectResponse("/staff/settings?success=staff_removed", status_code=303)
+
+
+@app.post("/staff/settings/add_role")
+async def add_role_config(request: Request):
+    c = _ctx(request)
+    if _require_staff(c):
+        return RedirectResponse("/?error=unauthorized")
+    form = await request.form()
+    role_id = form.get("role_id", "").strip()
+    role_name = form.get("role_name", "").strip()
+    tier = int(form.get("permission_tier", 1))
+    if not role_id.isdigit():
+        return RedirectResponse("/staff/settings?error=invalid_role_id", status_code=303)
+    if tier not in (1, 2, 3):
+        tier = 1
+    try:
+        await db.add_role_config(int(role_id), role_name or f"Role {role_id}", tier, c["user"]["id"])
+        await db.add_audit(c["user"]["id"], c["user"].get("username", "?"), "add_role_config",
+                           details=f"role={role_id} tier={tier} name={role_name}")
+    except Exception as e:
+        print(f"[SETTINGS] Add role config error: {e}")
+        return RedirectResponse("/staff/settings?error=db_error", status_code=303)
+    return RedirectResponse("/staff/settings?success=role_added", status_code=303)
+
+
+@app.post("/staff/settings/remove_role/{role_id}")
+async def remove_role_config(request: Request, role_id: int):
+    c = _ctx(request)
+    if _require_staff(c):
+        return RedirectResponse("/?error=unauthorized")
+    try:
+        await db.remove_role_config(role_id)
+        await db.add_audit(c["user"]["id"], c["user"].get("username", "?"), "remove_role_config",
+                           details=f"role={role_id}")
+    except Exception as e:
+        print(f"[SETTINGS] Remove role config error: {e}")
+    return RedirectResponse("/staff/settings?success=role_removed", status_code=303)
