@@ -1,21 +1,32 @@
 {% extends "base.html" %}
 {% block title %}Home{% endblock %}
 {% block content %}
+<!-- Brand Guide §7.1 — Hero: animated GIF, full width, 40-60vh, dark overlay -->
 <section class="hero">
-    <div class="hero-bg"></div>
+    <div class="hero-bg">
+        <img src="/static/fallen-hero.gif" alt="" loading="lazy">
+    </div>
     <div class="hero-content">
-        <img src="/static/logo.svg" alt="The Fallen" class="hero-logo">
         <h1 class="hero-title">THE FALLEN</h1>
-        <p class="hero-sub">Rise from the shadows. Dominate the battlefield.</p>
+        <p class="hero-subtitle">Rise from the shadows. Dominate the battlefield.</p>
+        <div class="hero-stats">
+            <div><div class="hero-stat-value">{{ (stats.total_users or 0)|fnum }}</div><div class="hero-stat-label">Members</div></div>
+            <div><div class="hero-stat-value">{{ (stats.verified_users or 0)|fnum }}</div><div class="hero-stat-label">Verified</div></div>
+            <div><div class="hero-stat-value">{{ (stats.active_24h or 0)|fnum }}</div><div class="hero-stat-label">Active Today</div></div>
+        </div>
         {% if not user %}
-        <a href="/auth/login" class="btn btn-hero">Login with Discord</a>
+        <a href="/auth/login" class="hero-cta">Login with Discord</a>
+        {% else %}
+        <a href="/profile" class="hero-cta">View Profile</a>
         {% endif %}
     </div>
 </section>
+
+<!-- Brand Guide §9 — Server Overview Cards -->
 <section class="section">
     <h2 class="section-title">Server Overview</h2>
     <div class="stat-grid">
-        <div class="stat-card"><div class="stat-value">{{ (stats.total_users or 0)|fnum }}</div><div class="stat-label">Members</div></div>
+        <div class="stat-card accent"><div class="stat-value">{{ (stats.total_users or 0)|fnum }}</div><div class="stat-label">Members</div></div>
         <div class="stat-card"><div class="stat-value">{{ (stats.verified_users or 0)|fnum }}</div><div class="stat-label">Verified</div></div>
         <div class="stat-card"><div class="stat-value">{{ (stats.active_24h or 0)|fnum }}</div><div class="stat-label">Active Today</div></div>
         <div class="stat-card"><div class="stat-value">{{ (stats.active_7d or 0)|fnum }}</div><div class="stat-label">Active 7d</div></div>
@@ -25,30 +36,63 @@
         <div class="stat-card accent"><div class="stat-value">{{ stats.avg_level or 0 }}</div><div class="stat-label">Avg Level</div></div>
     </div>
 </section>
+
+<!-- Brand Guide §9 — Leaderboard Top 3 with Gold/Silver/Bronze -->
 <section class="section">
-    <div class="section-header"><h2 class="section-title">Top Players</h2><a href="/leaderboard" class="btn btn-sm">Full Leaderboard →</a></div>
-    <div class="top-players">
-        {% for p in top_players %}
-        <div class="player-card {% if loop.index == 1 %}first{% elif loop.index == 2 %}second{% elif loop.index == 3 %}third{% endif %}">
-            <div class="player-rank">#{{ loop.index }}</div>
-            <div class="player-info">
-                <div class="player-name">{{ p.roblox_username or 'Unknown' }}{% if p.stage_rank %}<span class="stage-badge">⚔️ #{{ p.stage_rank }}</span>{% endif %}</div>
-                <div class="player-stats"><span>Lvl {{ p.level or 0 }}</span><span class="sep">·</span><span>{{ (p.xp or 0)|fnum }} XP</span><span class="sep">·</span><span>{{ p.elo_rating or 1000 }} ELO</span></div>
-            </div>
-            <div class="player-level"><div class="level-badge">{{ p.level or 0 }}</div></div>
-        </div>
-        {% endfor %}
-        {% if not top_players %}<p class="empty-text">No player data yet.</p>{% endif %}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 class="section-title" style="margin-bottom:0">Top Players</h2>
+        <a href="/leaderboard" class="btn btn-sm btn-secondary">Full Leaderboard →</a>
     </div>
+    {% if top_players and top_players|length >= 3 %}
+    <div class="player-cards">
+        <div class="player-card silver">
+            <div class="medal">🥈</div>
+            <div class="name">{{ top_players[1].roblox_username or 'Unknown' }}</div>
+            <div class="score">Lvl {{ top_players[1].level or 0 }} · {{ (top_players[1].xp or 0)|fnum }} XP</div>
+        </div>
+        <div class="player-card gold">
+            <div class="medal">👑</div>
+            <div class="name">{{ top_players[0].roblox_username or 'Unknown' }}</div>
+            <div class="score">Lvl {{ top_players[0].level or 0 }} · {{ (top_players[0].xp or 0)|fnum }} XP</div>
+        </div>
+        <div class="player-card bronze">
+            <div class="medal">🥉</div>
+            <div class="name">{{ top_players[2].roblox_username or 'Unknown' }}</div>
+            <div class="score">Lvl {{ top_players[2].level or 0 }} · {{ (top_players[2].xp or 0)|fnum }} XP</div>
+        </div>
+    </div>
+    {% endif %}
+    {% for p in top_players[3:] %}
+    {% if loop.index <= 7 %}
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
+        <span style="font-weight:700;color:var(--text-muted);min-width:28px">#{{ loop.index + 3 }}</span>
+        <span style="flex:1;font-weight:500">{{ p.roblox_username or 'Unknown' }}</span>
+        <span style="color:var(--text-muted);font-size:13px">Lvl {{ p.level or 0 }}</span>
+        <span style="color:var(--text-muted);font-size:13px">{{ (p.xp or 0)|fnum }} XP</span>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% if not top_players %}<div class="empty-state"><h3>No Players Yet</h3><p class="empty-text">Data will appear once the bot syncs.</p></div>{% endif %}
 </section>
+
 {% if war_record and war_record.total > 0 %}
 <section class="section">
     <h2 class="section-title">War Record</h2>
+    <div class="raids-two-col">
+        <div class="stat-card">
+            <div class="stat-value" style="color:var(--success)">{{ war_record.wins or 0 }}W</div>
+            <div class="stat-label">Victories</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:var(--error)">{{ war_record.losses or 0 }}L</div>
+            <div class="stat-label">Defeats</div>
+        </div>
+    </div>
     {% set total = war_record.total or 1 %}
-    <div class="war-record-bar">
-        <div class="war-wins" style="width:{{ (war_record.wins/total*100)|int }}%">{{ war_record.wins }}W</div>
-        {% if war_record.draws %}<div class="war-draws" style="width:{{ (war_record.draws/total*100)|int }}%">{{ war_record.draws }}D</div>{% endif %}
-        <div class="war-losses" style="width:{{ (war_record.losses/total*100)|int }}%">{{ war_record.losses }}L</div>
+    <div class="war-bar">
+        <div class="war-bar-wins" style="width:{{ (war_record.wins / total * 100)|int }}%"></div>
+        {% if war_record.draws %}<div class="war-bar-draws" style="width:{{ (war_record.draws / total * 100)|int }}%"></div>{% endif %}
+        <div class="war-bar-losses" style="width:{{ (war_record.losses / total * 100)|int }}%"></div>
     </div>
 </section>
 {% endif %}
