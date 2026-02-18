@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Tournament Detail{% endblock %}
+{% block content %}
+<section class="section">
+    {% set active = 'tournaments' %}{% include "staff/_nav.html" %}
+    <a href="/staff/tournaments" class="btn btn-sm" style="margin-bottom:16px">← Back</a>
+
+    {% if success %}
+    <div class="success-banner">✅ {{ success|replace('_',' ')|title }}!</div>
+    {% endif %}
+
+    {% if not tournament %}
+    <div class="empty-state"><h2>Not Found</h2></div>
+    {% else %}
+    {% set t = tournament %}
+    <div class="tournament-header">
+        <h2>{{ t.title }}</h2>
+        <span class="tournament-status {{ t.status }}">{{ t.status|upper }}</span>
+    </div>
+
+    <div class="stat-grid compact">
+        <div class="stat-card"><div class="stat-value">{{ t.bracket_size }}</div><div class="stat-label">Bracket Size</div></div>
+        <div class="stat-card"><div class="stat-value">{{ t.participants|length }}</div><div class="stat-label">Registered</div></div>
+        <div class="stat-card"><div class="stat-value">{{ t.entry_fee or 0 }}</div><div class="stat-label">Entry Fee (FC)</div></div>
+    </div>
+
+    {% if t.entry_requirement %}<p style="color:var(--muted);margin:8px 0"><strong>Requirements:</strong> {{ t.entry_requirement }}</p>{% endif %}
+    {% if t.prize_pool %}<p style="color:var(--muted);margin:8px 0"><strong>Prize Pool:</strong> {{ t.prize_pool }}</p>{% endif %}
+    {% if t.match_rules %}<p style="color:var(--muted);margin:8px 0"><strong>Rules:</strong> {{ t.match_rules }}</p>{% endif %}
+
+    <!-- Status Controls -->
+    <div class="staff-card" style="margin-top:20px">
+        <h3>📋 Tournament Controls</h3>
+        <div class="tournament-controls">
+            {% if t.status == 'draft' %}
+            <form method="POST" action="/staff/tournament/{{ t.id }}/status" style="display:inline"><input type="hidden" name="status" value="open"><button type="submit" class="btn">Open Registration</button></form>
+            {% elif t.status == 'open' %}
+            <form method="POST" action="/staff/tournament/{{ t.id }}/status" style="display:inline"><input type="hidden" name="status" value="active"><button type="submit" class="btn" onclick="return confirm('Start the tournament?')">Start Tournament</button></form>
+            <form method="POST" action="/staff/tournament/{{ t.id }}/status" style="display:inline"><input type="hidden" name="status" value="draft"><button type="submit" class="btn btn-sm">Back to Draft</button></form>
+            {% elif t.status == 'active' %}
+            <form method="POST" action="/staff/tournament/{{ t.id }}/status" style="display:inline"><input type="hidden" name="status" value="completed"><button type="submit" class="btn" onclick="return confirm('Mark tournament as completed?')">Complete Tournament</button></form>
+            {% elif t.status == 'completed' %}
+            <form method="POST" action="/staff/tournament/{{ t.id }}/status" style="display:inline"><input type="hidden" name="status" value="archived"><button type="submit" class="btn btn-sm">Archive</button></form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Add Player -->
+    {% if t.status in ['draft','open'] %}
+    <div class="staff-card" style="margin-top:16px">
+        <h3>➕ Add Player</h3>
+        <form method="POST" action="/staff/tournament/{{ t.id }}/add_player" class="form-inline">
+            <input type="number" name="user_id" required placeholder="Discord User ID" class="search-input" style="max-width:300px">
+            <button type="submit" class="btn btn-sm">Add</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Participants -->
+    <div class="staff-card" style="margin-top:16px">
+        <h3>👥 Participants ({{ t.participants|length }}/{{ t.bracket_size }})</h3>
+        {% if t.participants %}
+        <table class="profile-table">
+            <thead><tr><th>Seed</th><th>Player</th><th>ELO</th><th>Status</th><th></th></tr></thead>
+            <tbody>{% for p in t.participants %}<tr class="{% if p.status == 'disqualified' %}warn-expired{% endif %}">
+                <td>{{ p.seed or loop.index }}</td>
+                <td><a href="/staff/member/{{ p.user_id }}">{{ p.roblox_username or p.user_id }}</a></td>
+                <td>{{ p.elo_rating or 1000 }}</td>
+                <td><span class="app-status {{ p.status }}">{{ p.status }}</span></td>
+                <td>{% if p.status == 'active' and t.status in ['draft','open','active'] %}
+                    <form method="POST" action="/staff/tournament/{{ t.id }}/disqualify" style="display:inline"><input type="hidden" name="user_id" value="{{ p.user_id }}"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Disqualify this player?')">DQ</button></form>
+                {% endif %}</td>
+            </tr>{% endfor %}</tbody>
+        </table>
+        {% else %}<p class="empty-text">No participants registered yet.</p>{% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
