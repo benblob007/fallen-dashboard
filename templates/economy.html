@@ -1,48 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Economy{% endblock %}
+{% block title %}Staff Economy{% endblock %}
 {% block content %}
 <section class="section">
-    <h2 class="section-title">💰 Economy</h2>
+    <h2 class="section-title">💰 Economy Control</h2>
+    {% set active = 'economy' %}{% include "staff/_nav.html" %}
 
     <div class="stat-grid compact">
-        <div class="stat-card"><div class="stat-value">{{ (eco.total_coins_circulation or 0)|fnum }}</div><div class="stat-label">Total FCoins</div></div>
-        <div class="stat-card"><div class="stat-value">{{ (eco.avg_coins or 0)|fnum }}</div><div class="stat-label">Avg Per Player</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (eco.total_coins_circulation or 0)|fnum }}</div><div class="stat-label">Total FC in Circulation</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (eco.avg_coins or 0)|fnum }}</div><div class="stat-label">Average per User</div></div>
     </div>
 
-    <div class="raids-two-col">
-        <div class="raid-section-card">
-            <h3>👑 Richest Members</h3>
-            <table class="mini-table">
+    <div class="staff-grid">
+        <div class="staff-card">
+            <h3>💎 Richest Members</h3>
+            {% if eco.richest %}
+            <table class="profile-table">
                 <thead><tr><th>#</th><th>Player</th><th>Coins</th><th>Level</th></tr></thead>
-                <tbody>
-                    {% for r in eco.richest %}
-                    <tr>
-                        <td>{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</td>
-                        <td>{{ r.name }}</td>
-                        <td><strong>{{ r.coins|fnum }}</strong></td>
-                        <td>{{ r.level or 0 }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if not eco.richest %}<tr><td colspan="4" class="td-empty">No data.</td></tr>{% endif %}
-                </tbody>
+                <tbody>{% for r in eco.richest %}<tr>
+                    <td>{{ loop.index }}</td><td>{{ r.name }}</td><td>{{ r.coins|fnum }}</td><td>{{ r.level }}</td>
+                </tr>{% endfor %}</tbody>
             </table>
+            {% else %}<p class="empty-text">No data.</p>{% endif %}
         </div>
-
-        <div class="raid-section-card">
+        <div class="staff-card">
             <h3>🛒 Shop Catalog</h3>
-            <div class="shop-grid">
-                {% for item in shop %}
-                <div class="shop-item">
-                    <div class="shop-item-name">{{ item.name }}</div>
-                    <div class="shop-item-meta">
-                        <span class="shop-price">{{ item.price|fnum }} FC</span>
-                        <span class="shop-type">{{ item.type }}</span>
-                    </div>
-                </div>
-                {% endfor %}
-                {% if not shop %}<p class="empty-text">No items.</p>{% endif %}
-            </div>
+            {% if shop %}
+            <table class="profile-table">
+                <thead><tr><th>Item</th><th>Price</th><th>Type</th></tr></thead>
+                <tbody>{% for item in shop %}<tr>
+                    <td>{{ item.name }}</td><td>{{ item.price|fnum }} FC</td><td>{{ item.type }}</td>
+                </tr>{% endfor %}</tbody>
+            </table>
+            {% else %}<p class="empty-text">Shop not configured.</p>{% endif %}
         </div>
     </div>
+
+    {% if transactions %}
+    <div class="staff-card" style="margin-top:20px">
+        <h3>📜 Recent Transactions</h3>
+        <table class="profile-table">
+            <thead><tr><th>User</th><th>Amount</th><th>Type</th><th>When</th></tr></thead>
+            <tbody>{% for t in transactions %}<tr>
+                <td>{{ t.user_id }}</td>
+                <td class="{% if (t.amount or 0) > 0 %}text-green{% else %}text-red{% endif %}">{{ (t.amount or 0)|fnum }} FC</td>
+                <td>{{ t.transaction_type or '?' }}</td>
+                <td>{{ t.created_at|timeago if t.created_at else '' }}</td>
+            </tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    {% endif %}
 </section>
 {% endblock %}
