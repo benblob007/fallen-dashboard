@@ -1,8 +1,8 @@
-“””
+"""
 ✝ THE FALLEN ✝ — Web Dashboard (v4 — Full Staff Expansion)
 All public pages, staff dashboard with 12 sections, tournament management,
 economy control, XP system, level BG customization.
-“””
+"""
 import os, time
 from contextlib import asynccontextmanager
 from collections import defaultdict
