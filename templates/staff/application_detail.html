@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% block title %}Application #{{ application.id if application else '?' }}{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  {% if not application %}<p class="muted">Application not found.</p>
+  {% else %}
+  {% set a = application %}
+  <h1 class="page-title">Application #{{ a.id }} <span class="badge badge-{{ a.status }}">{{ a.status }}</span></h1>
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="detail-grid">
+        <div><span class="label">Applicant</span><a href="/staff/member/{{ a.user_id }}">{{ a.roblox_username }} ({{ a.user_id }})</a></div>
+        <div><span class="label">Position</span><span>{{ a.position_title or '?' }}</span></div>
+        <div><span class="label">Level</span><span>{{ a.level or 0 }}</span></div>
+        <div><span class="label">XP</span><span>{{ (a.xp or 0)|fnum }}</span></div>
+        <div><span class="label">Submitted</span><span>{{ a.created_at|timeago }}</span></div>
+        {% if a.reviewed_at %}<div><span class="label">Reviewed</span><span>{{ a.reviewed_at|timeago }}</span></div>{% endif %}
+      </div>
+      {% if a.requirements %}<div class="mt-3"><span class="label">Requirements</span><p>{{ a.requirements }}</p></div>{% endif %}
+      <div class="mt-3"><span class="label">Answers</span><p class="pre-wrap">{{ a.answers or 'No answers provided' }}</p></div>
+      {% if a.review_note %}<div class="mt-3"><span class="label">Review Note</span><p>{{ a.review_note }}</p></div>{% endif %}
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">Staff Votes ({{ (a.votes or [])|length }})</div>
+      <div class="card-body">
+        {% set approve = 0 %}{% set deny = 0 %}
+        {% for v in (a.votes or []) %}
+          {% if v.vote == 'approve' %}{% set approve = approve + 1 %}{% elif v.vote == 'deny' %}{% set deny = deny + 1 %}{% endif %}
+          <div class="list-row">
+            <span class="badge badge-{{ 'active' if v.vote=='approve' else 'high' if v.vote=='deny' else '' }}">{{ v.vote }}</span>
+            <span>Staff {{ v.staff_id }}</span>
+            {% if v.comment %}<span class="muted">{{ v.comment }}</span>{% endif %}
+            <span class="muted">{{ v.created_at|timeago }}</span>
+          </div>
+        {% else %}<p class="muted">No votes yet</p>{% endfor %}
+        {% if a.votes %}<div class="mt-2"><strong class="text-green">{{ approve }} approve</strong> / <strong class="text-red">{{ deny }} deny</strong></div>{% endif %}
+        <form method="post" action="/staff/application/{{ a.id }}/vote" class="mt-3">
+          <div class="grid-2">
+            <select name="vote" class="input"><option value="approve">Approve</option><option value="deny">Deny</option><option value="abstain">Abstain</option></select>
+            <input type="text" name="comment" class="input" placeholder="Comment (optional)">
+          </div>
+          <button type="submit" class="btn btn-red mt-2">Cast Vote</button>
+        </form>
+      </div>
+    </div>
+    {% if a.status == 'applied' %}
+    <div class="card">
+      <div class="card-header">Decision</div>
+      <div class="card-body">
+        <form method="post" action="/staff/application/{{ a.id }}/status">
+          <select name="status" class="input"><option value="accepted">Accept</option><option value="denied">Deny</option><option value="waitlisted">Waitlist</option><option value="interview">Schedule Interview</option></select>
+          <textarea name="review_note" class="input mt-2" rows="2" placeholder="Note to applicant..."></textarea>
+          <button type="submit" class="btn btn-red mt-2">Update Status</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div></div>
+{% endblock %}
