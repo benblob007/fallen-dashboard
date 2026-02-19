@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Raids & Wars{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">⚔️ Raids & Wars</h2>
+
+    {% if war_record and war_record.total > 0 %}
+    <div class="war-record-banner">
+        <h3 class="war-banner-title">Clan War Record</h3>
+        <div class="war-record-stats">
+            <div class="war-stat"><span class="war-stat-value won">{{ war_record.wins }}</span><span class="war-stat-label">Wins</span></div>
+            <div class="war-stat"><span class="war-stat-value">{{ war_record.total }}</span><span class="war-stat-label">Total</span></div>
+            <div class="war-stat"><span class="war-stat-value lost">{{ war_record.losses }}</span><span class="war-stat-label">Losses</span></div>
+        </div>
+        {% set wr = ((war_record.wins / war_record.total) * 100) if war_record.total > 0 else 0 %}
+        <div class="war-progress"><div class="war-progress-fill" style="width:{{ wr|int }}%"></div></div>
+        <p class="war-progress-label">{{ wr|int }}% Win Rate</p>
+    </div>
+    {% endif %}
+
+    <div class="raids-grid">
+        <div class="raid-card">
+            <h3 class="raid-card-title">🏅 Top Raiders</h3>
+            {% if raid_leaders %}
+            <table class="profile-table">
+                <thead><tr><th>#</th><th>Player</th><th>Raids</th><th>Wins</th><th>MVPs</th></tr></thead>
+                <tbody>
+                {% for r in raid_leaders %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ r.roblox_username or r.get('roblox_username', 'Unknown') }}</td>
+                    <td>{{ r.raids_participated or r.raid_participation or 0 }}</td>
+                    <td>{{ r.raids_won or r.raid_wins or 0 }}</td>
+                    <td>{{ r.mvp_count or 0 }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state-sm">No raid data yet. Participate in raids to appear here!</div>
+            {% endif %}
+        </div>
+
+        <div class="raid-card">
+            <h3 class="raid-card-title">🗡️ Recent Wars</h3>
+            {% if recent_wars %}
+            <div class="war-list">
+                {% for w in recent_wars %}
+                <div class="war-item {{ w.status or 'pending' }}">
+                    <span class="war-item-opponent">vs {{ w.opponent or 'Unknown' }}</span>
+                    <span class="war-item-score">{{ w.our_score or 0 }} - {{ w.their_score or 0 }}</span>
+                    <span class="war-item-status">{{ (w.status or 'pending')|upper }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state-sm">No wars recorded yet.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if recent_raids %}
+    <div class="raid-card" style="margin-top:20px">
+        <h3 class="raid-card-title">📋 Recent Raid Sessions</h3>
+        <div class="raid-feed">
+            {% for r in recent_raids %}
+            <div class="raid-feed-item">
+                <span class="raid-feed-type">{{ r.raid_type or 'Raid' }}</span>
+                <div class="raid-feed-details">
+                    <span>{{ r.target or 'Unknown' }}</span>
+                    {% if r.score %}<span class="raid-feed-score">Score: {{ r.score }}</span>{% endif %}
+                </div>
+                <div class="raid-feed-meta">
+                    <span>{{ r.participants or 0 }} players</span>
+                    <span class="raid-feed-status {{ r.status or 'pending' }}">{{ (r.status or 'pending')|upper }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
