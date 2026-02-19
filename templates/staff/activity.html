@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}Activity Tracking{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">Activity Tracking</h1>
+  {% set a = activity or {} %}
+  <div class="stat-row mb-4">
+    <div class="stat-box"><div class="stat-val">{{ (a.msg_total or 0)|fnum }}</div><div class="stat-label">Total Messages</div></div>
+    <div class="stat-box"><div class="stat-val">{{ (a.voice_total or 0)|ftime }}</div><div class="stat-label">Total Voice</div></div>
+    <div class="stat-box"><div class="stat-val">{{ a.active_7d or 0 }}</div><div class="stat-label">Active (7d)</div></div>
+    <div class="stat-box"><div class="stat-val">{{ a.active_30d or 0 }}</div><div class="stat-label">Active (30d)</div></div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">Top Messagers</div>
+      <div class="card-body">
+        {% for u in (a.top_msg or []) %}
+        <div class="list-row"><a href="/staff/member/{{ u.user_id }}">{{ u.name }}</a><span>{{ u.messages|fnum }} msgs</span></div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Top Voice</div>
+      <div class="card-body">
+        {% for u in (a.top_voice or []) %}
+        <div class="list-row"><a href="/staff/member/{{ u.user_id }}">{{ u.name }}</a><span>{{ u.voice_time|ftime }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% if a.inactive_users %}
+  <div class="card mt-4">
+    <div class="card-header">Inactive Users (14d+)</div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>User</th><th>Level</th><th>Last Active</th></tr></thead>
+          <tbody>
+          {% for u in a.inactive_users[:30] %}
+          <tr><td><a href="/staff/member/{{ u.user_id }}">{{ u.name }}</a></td><td>{{ u.level }}</td><td>{{ u.last_active|timeago }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div></div>
+{% endblock %}

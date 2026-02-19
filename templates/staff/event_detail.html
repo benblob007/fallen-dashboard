@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% block title %}Event: {{ event.title if event else '?' }}{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  {% if not event %}<p class="muted">Event not found.</p>
+  {% else %}
+  <div class="page-header"><h1 class="page-title">{{ event.title }} <span class="badge badge-{{ event.status }}">{{ event.status }}</span></h1></div>
+  <div class="card">
+    <div class="card-body">
+      <div class="detail-grid">
+        <div><span class="label">Type</span><span class="badge">{{ event.event_type }}</span></div>
+        <div><span class="label">Scheduled</span><span>{{ event.scheduled_at|timeago if event.scheduled_at else 'TBD' }}</span></div>
+        <div><span class="label">Duration</span><span>{{ event.duration_minutes }}m</span></div>
+        <div><span class="label">Min Level</span><span>{{ event.min_level or 0 }}</span></div>
+        <div><span class="label">Rewards</span><span>{{ event.xp_reward }} XP / {{ event.coin_reward }} FC</span></div>
+        <div><span class="label">Created By</span><span>{{ event.created_by_name or '?' }}</span></div>
+      </div>
+      {% if event.description %}<p class="mt-3">{{ event.description }}</p>{% endif %}
+      {% if event.summary %}<div class="mt-3"><span class="label">Summary</span><p>{{ event.summary }}</p></div>{% endif %}
+    </div>
+  </div>
+  <div class="grid-2 mt-4">
+    <div class="card">
+      <div class="card-header">Sign-ups ({{ (event.signups or [])|length }}{% if event.max_participants %}/{{ event.max_participants }}{% endif %})</div>
+      <div class="card-body">
+        {% for s in (event.signups or []) %}
+        <div class="list-row">
+          <a href="/staff/member/{{ s.user_id }}">{{ s.name }}</a>
+          <span class="muted">Lvl {{ s.level }}</span>
+          <span class="badge badge-{{ 'active' if s.attended else s.status }}">{{ 'Attended' if s.attended else s.status }}</span>
+          {% if event.status in ('active','completed') %}
+          <form method="post" action="/staff/event/{{ event.id }}/attendance" class="inline-form">
+            <input type="hidden" name="user_id" value="{{ s.user_id }}">
+            <input type="hidden" name="attended" value="true">
+            <input type="number" name="score" value="{{ s.performance_score or 0 }}" class="input-xs" placeholder="Score">
+            <button type="submit" class="btn btn-xs">Mark</button>
+          </form>
+          {% endif %}
+        </div>
+        {% else %}<p class="muted">No sign-ups yet</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Status Control</div>
+      <div class="card-body">
+        <form method="post" action="/staff/event/{{ event.id }}/status">
+          <select name="status" class="input">
+            <option value="scheduled">Scheduled</option><option value="active">Active</option>
+            <option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+          </select>
+          <textarea name="summary" class="input mt-2" rows="2" placeholder="Event summary (for completion)..."></textarea>
+          <button type="submit" class="btn btn-red mt-2">Update Status</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div></div>
+{% endblock %}
