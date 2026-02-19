@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">📊 Server Analytics</h2>
+    {% if data %}
+    <!-- Overview Stats -->
+    <div class="stat-grid compact">
+        <div class="stat-card"><div class="stat-value">{{ (data.total_users or 0)|fnum }}</div><div class="stat-label">Total Users</div></div>
+        <div class="stat-card"><div class="stat-value">{{ data.verified_count or 0 }}</div><div class="stat-label">Verified</div></div>
+        <div class="stat-card"><div class="stat-value">{{ data.avg_level or 0 }}</div><div class="stat-label">Avg Level</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (data.total_messages or 0)|fnum }}</div><div class="stat-label">Total Messages</div></div>
+    </div>
+
+    <!-- Activity Breakdown -->
+    <div class="raids-two-col">
+        <div class="profile-section-card">
+            <h3>🟢 Activity Breakdown</h3>
+            {% set act = data.activity_breakdown or {} %}
+            {% set total = data.total_users or 1 %}
+            <div class="activity-bars">
+                <div class="act-row"><span class="act-label">Active 24h</span><div class="act-bar-wrap"><div class="act-bar green" style="width:{{ (act.get('24h',0)/total*100)|int }}%">{{ act.get('24h',0) }}</div></div></div>
+                <div class="act-row"><span class="act-label">Active 7d</span><div class="act-bar-wrap"><div class="act-bar yellow" style="width:{{ (act.get('7d',0)/total*100)|int }}%">{{ act.get('7d',0) }}</div></div></div>
+                <div class="act-row"><span class="act-label">Active 30d</span><div class="act-bar-wrap"><div class="act-bar orange" style="width:{{ (act.get('30d',0)/total*100)|int }}%">{{ act.get('30d',0) }}</div></div></div>
+                <div class="act-row"><span class="act-label">Inactive</span><div class="act-bar-wrap"><div class="act-bar red" style="width:{{ (act.get('inactive',0)/total*100)|int }}%">{{ act.get('inactive',0) }}</div></div></div>
+            </div>
+        </div>
+
+        <div class="profile-section-card">
+            <h3>📈 Level Distribution</h3>
+            {% set ld = data.level_distribution or {} %}
+            {% set max_ld = ld.values()|max if ld.values()|list else 1 %}
+            <div class="dist-bars">
+                {% for bucket, count in ld.items() %}
+                <div class="dist-row"><span class="dist-label">{{ bucket }}</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:{{ (count/max_ld*100)|int }}%"><span>{{ count }}</span></div></div></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ELO Distribution -->
+    {% if data.elo_distribution %}
+    <div class="profile-section-card full-width" style="margin-top:16px">
+        <h3>⚔️ ELO Distribution</h3>
+        {% set ed = data.elo_distribution %}
+        {% set max_ed = ed.values()|max if ed.values()|list else 1 %}
+        <div class="dist-bars">
+            {% for tier, count in ed.items() %}
+            <div class="dist-row"><span class="dist-label">{{ tier }}</span><div class="dist-bar-wrap"><div class="dist-bar elo-bar" style="width:{{ (count/max_ed*100)|int }}%"><span>{{ count }}</span></div></div></div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Top Performers -->
+    <div class="top-performers-grid">
+        {% for cat, items, icon in [("Top XP", data.top_xp or [], "⭐"), ("Top Messages", data.top_messages or [], "💬"), ("Top Voice", data.top_voice or [], "🎙️"), ("Top Raiders", data.top_raiders or [], "🔥"), ("Top Duelers", data.top_duelers or [], "⚔️")] %}
+        <div class="top-card">
+            <h4>{{ icon }} {{ cat }}</h4>
+            {% for p in items %}
+            <div class="top-row"><span class="top-rank">#{{ loop.index }}</span><span class="top-name">{{ p.name }}</span><span class="top-val">{{ p.value|fnum }}</span></div>
+            {% endfor %}
+            {% if not items %}<p class="empty-text">—</p>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-text">No analytics data available.</p>
+    {% endif %}
+</section>
+{% endblock %}
