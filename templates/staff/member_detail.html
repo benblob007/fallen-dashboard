@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Member Detail{% endblock %}
+{% block content %}
+<section class="section">
+    {% set active = 'members' %}{% include "staff/_nav.html" %}
+    <a href="/staff/members" class="btn btn-sm" style="margin-bottom:16px">← Back</a>
+
+    {% if success %}
+    <div class="success-banner">
+        ✅ {% if 'warn' in success %}Warning{% elif 'timeout' in success %}Timeout{% elif 'xp' in success %}XP adjustment{% elif 'coins' in success %}Coin adjustment{% elif 'elo' in success %}ELO change{% elif 'kick' in success %}Kick{% elif 'ban' in success %}Ban{% elif 'insufficient' in success %}⚠️ Insufficient permissions{% else %}Action{% endif %}
+        {% if 'insufficient' not in success %}queued! The bot will execute it within ~30 seconds.{% endif %}
+    </div>
+    {% endif %}
+
+    {% if not member %}
+    <div class="empty-state"><h2>Not Found</h2><p>No data for this user.</p></div>
+    {% else %}
+    <div class="member-detail-header">
+        <img src="{{ member.avatar_url or 'https://cdn.discordapp.com/embed/avatars/' ~ (member.user_id|int % 5) ~ '.png' }}" class="member-detail-avatar" alt="">
+        <div>
+            <h2>{{ member.roblox_username or 'Unknown' }} <span class="uid">({{ member.user_id }})</span></h2>
+            {% if member.verified %}<span class="verified-badge">✓ Verified</span>{% endif %}
+            {% if member.stage_rank %}<span class="profile-pill roster">Roster #{{ member.stage_rank }}</span>{% endif %}
+        </div>
+    </div>
+
+    <div class="stat-grid compact">
+        <div class="stat-card"><div class="stat-value">{{ member.level or 0 }}</div><div class="stat-label">Level</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (member.xp or 0)|fnum }}</div><div class="stat-label">XP</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (member.coins or 0)|fnum }}</div><div class="stat-label">Coins</div></div>
+        <div class="stat-card"><div class="stat-value">{{ member.elo_rating or 1000 }}</div><div class="stat-label">ELO</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (member.messages or 0)|fnum }}</div><div class="stat-label">Messages</div></div>
+        <div class="stat-card"><div class="stat-value">{{ (member.voice_time or 0)|ftime }}</div><div class="stat-label">Voice</div></div>
+        <div class="stat-card"><div class="stat-value">{{ member.wins or 0 }}/{{ member.losses or 0 }}</div><div class="stat-label">Duel W/L</div></div>
+        <div class="stat-card"><div class="stat-value">{{ member.raid_participation or 0 }}</div><div class="stat-label">Raids</div></div>
+    </div>
+
+    <!-- ══════ MODERATION ACTIONS ══════ -->
+    <div class="action-panel">
+        <h3>🛡️ Moderation Actions</h3>
+        <p class="action-note">Actions are queued and executed by the bot within ~30 seconds.</p>
+        <div class="action-tabs">
+            <button class="action-tab active" onclick="showTab(this,'warn')">⚠️ Warn</button>
+            <button class="action-tab" onclick="showTab(this,'timeout')">🔇 Timeout</button>
+            <button class="action-tab" onclick="showTab(this,'xp')">✨ XP</button>
+            <button class="action-tab" onclick="showTab(this,'coins')">💰 Coins</button>
+            <button class="action-tab" onclick="showTab(this,'elo')">⚔️ ELO</button>
+            {% if permission_tier >= 2 %}<button class="action-tab" onclick="showTab(this,'kick')">🚪 Kick</button>{% endif %}
+            {% if permission_tier >= 3 %}<button class="action-tab danger" onclick="showTab(this,'ban')">🔨 Ban</button>{% endif %}
+        </div>
+
+        <div class="action-form" id="tab-warn">
+            <form method="POST" action="/staff/action/warn/{{ member.user_id }}" onsubmit="return confirm('Issue this warning?')">
+                <label>Category</label>
+                <select name="category" required>
+                    <optgroup label="Minor (1-2 pts)">{% for cid, cat in warn_categories.items() if cat.points <= 2 %}<option value="{{ cid }}">{{ cat.name }} ({{ cat.points }}pt)</option>{% endfor %}</optgroup>
+                    <optgroup label="Moderate (3-4 pts)">{% for cid, cat in warn_categories.items() if cat.points >= 3 and cat.points <= 4 %}<option value="{{ cid }}">{{ cat.name }} ({{ cat.points }}pt)</option>{% endfor %}</optgroup>
+                    <optgroup label="Instant Ban">{% for cid, cat in warn_categories.items() if cat.points >= 999 %}<option value="{{ cid }}">{{ cat.name }}</option>{% endfor %}</optgroup>
+                </select>
+                <label>Reason</label><textarea name="reason" placeholder="Details..." rows="2"></textarea>
+                <button type="submit" class="btn btn-danger">Issue Warning</button>
+            </form>
+        </div>
+        <div class="action-form hidden" id="tab-timeout">
+            <form method="POST" action="/staff/action/timeout/{{ member.user_id }}" onsubmit="return confirm('Timeout this user?')">
+                <label>Duration (minutes)</label>
+                <select name="duration"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="1440">24 hours</option></select>
+                <label>Reason</label><textarea name="reason" rows="2" placeholder="Optional reason..."></textarea>
+                <button type="submit" class="btn btn-danger">Timeout User</button>
+            </form>
+        </div>
+        <div class="action-form hidden" id="tab-xp">
+            <form method="POST" action="/staff/action/adjust_xp/{{ member.user_id }}">
+                <label>XP Amount (negative to remove)</label><input type="number" name="amount" required placeholder="e.g. 500 or -200">
+                <button type="submit" class="btn">Adjust XP</button>
+            </form>
+        </div>
+        <div class="action-form hidden" id="tab-coins">
+            <form method="POST" action="/staff/action/adjust_coins/{{ member.user_id }}">
+                <label>Coin Amount (negative to remove)</label><input type="number" name="amount" required placeholder="e.g. 1000 or -500">
+                <label>Reason</label><input type="text" name="reason" placeholder="e.g. Event reward">
+                <button type="submit" class="btn">Adjust Coins</button>
+            </form>
+        </div>
+        <div class="action-form hidden" id="tab-elo">
+            <form method="POST" action="/staff/action/set_elo/{{ member.user_id }}">
+                <label>Set ELO To</label><input type="number" name="elo" required value="{{ member.elo_rating or 1000 }}">
+                <button type="submit" class="btn">Set ELO</button>
+            </form>
+        </div>
+        {% if permission_tier >= 2 %}
+        <div class="action-form hidden" id="tab-kick">
+            <form method="POST" action="/staff/action/kick/{{ member.user_id }}" onsubmit="return confirm('Are you sure you want to KICK this user?')">
+                <label>Reason</label><textarea name="reason" rows="2" required placeholder="Kick reason..."></textarea>
+                <button type="submit" class="btn btn-danger">🚪 Kick User</button>
+            </form>
+        </div>
+        {% endif %}
+        {% if permission_tier >= 3 %}
+        <div class="action-form hidden" id="tab-ban">
+            <form method="POST" action="/staff/action/ban/{{ member.user_id }}" onsubmit="return confirm('⚠️ Are you ABSOLUTELY sure you want to BAN this user? This cannot be easily undone!')">
+                <label>Reason</label><textarea name="reason" rows="3" required placeholder="Ban reason..."></textarea>
+                <button type="submit" class="btn btn-danger">🔨 Ban User</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Warnings -->
+    {% if warn_data and warn_data.warnings %}
+    <div class="staff-card" style="margin-top:20px">
+        <h3>⚠️ Warning History ({{ warn_data.total_points or 0 }} pts)</h3>
+        {% for w in warn_data.warnings %}
+        <div class="warning-item {% if w.expired %}warn-expired{% else %}warn-active{% endif %}">
+            <span class="warn-cat-badge">{{ w.category or '?' }}</span>
+            <span class="warn-points-badge">{{ w.points or 0 }}pt</span>
+            <span>{{ w.reason or '—' }}</span>
+            <span class="warn-date">{{ w.timestamp|timeago if w.timestamp else '' }}</span>
+            {% if not w.expired %}
+            <form method="POST" action="/staff/action/remove_warn/{{ member.user_id }}" style="display:inline"><input type="hidden" name="warning_id" value="{{ w.id or loop.index }}"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remove this warning?')">✕</button></form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Action History -->
+    {% if action_history %}
+    <div class="staff-card" style="margin-top:20px">
+        <h3>📋 Action History</h3>
+        <table class="profile-table">
+            <thead><tr><th>Action</th><th>Staff</th><th>Status</th><th>When</th></tr></thead>
+            <tbody>{% for a in action_history %}<tr>
+                <td>{{ a.action_type }}</td><td>{{ a.staff_name or '?' }}</td>
+                <td><span class="app-status {{ a.status }}">{{ a.status }}</span></td>
+                <td>{{ a.created_at|timeago if a.created_at else '' }}</td>
+            </tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    {% endif %}
+    {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+function showTab(btn, id) {
+    document.querySelectorAll('.action-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.action-form').forEach(f => f.classList.add('hidden'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + id).classList.remove('hidden');
+}
+</script>
+{% endblock %}

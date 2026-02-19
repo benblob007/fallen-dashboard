@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Staff Tournaments{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">🏆 Tournament Management</h2>
+    {% set active = 'tournaments' %}{% include "staff/_nav.html" %}
+
+    {% if success == 'created' %}
+    <div class="success-banner">✅ Tournament created successfully!</div>
+    {% endif %}
+
+    <div class="staff-grid">
+        <div class="staff-card" style="grid-column:1/-1">
+            <h3>➕ Create New Tournament</h3>
+            <form method="POST" action="/staff/tournaments/create" class="tournament-form">
+                <div class="form-row-2">
+                    <div class="form-group"><label>Title</label><input type="text" name="title" required placeholder="e.g. Weekly 1v1 Championship"></div>
+                    <div class="form-group"><label>Bracket Size</label>
+                        <select name="bracket_size"><option value="4">4 players</option><option value="8" selected>8 players</option><option value="16">16 players</option><option value="32">32 players</option></select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Entry Requirement</label><input type="text" name="entry_requirement" placeholder="e.g. ELO 1200+, Level 10+"></div>
+                    <div class="form-group"><label>Entry Fee (FC)</label><input type="number" name="entry_fee" value="0" min="0"></div>
+                </div>
+                <div class="form-group"><label>Prize Pool</label><input type="text" name="prize_pool" placeholder="e.g. 1st: 5000 FC, 2nd: 2500 FC, 3rd: 1000 FC"></div>
+                <div class="form-group"><label>Match Rules</label><textarea name="match_rules" rows="3" placeholder="e.g. Best of 3, Sword only, No items..."></textarea></div>
+                <button type="submit" class="btn">Create Tournament</button>
+            </form>
+        </div>
+    </div>
+
+    {% if tournaments %}
+    <h3 style="margin-top:24px;color:var(--text)">All Tournaments</h3>
+    <table class="lb-table" style="margin-top:12px">
+        <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Bracket</th><th>Created</th><th></th></tr></thead>
+        <tbody>{% for t in tournaments %}<tr>
+            <td>#{{ t.id }}</td>
+            <td>{{ t.title }}</td>
+            <td><span class="tournament-status {{ t.status }}">{{ t.status|upper }}</span></td>
+            <td>{{ t.bracket_size }} players</td>
+            <td>{{ t.created_at|timeago if t.created_at else '' }}</td>
+            <td><a href="/staff/tournament/{{ t.id }}" class="btn btn-sm">Manage</a></td>
+        </tr>{% endfor %}</tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="margin-top:20px"><h2>No Tournaments</h2><p>Create your first tournament above.</p></div>
+    {% endif %}
+</section>
+{% endblock %}
