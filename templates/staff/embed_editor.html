@@ -1,0 +1,117 @@
+{% extends "base.html" %}{% block title %}{{ 'Edit' if embed else 'New' }} Embed{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  <h1 class="page-title">{{ 'Edit: ' + embed.name if embed else 'New Embed' }}</h1>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">Embed Data</div>
+      <div class="card-body">
+        <form method="post" action="/staff/embeds/save" id="embed-form">
+          <label>Name (unique)</label><input type="text" name="name" value="{{ embed.name if embed else '' }}" required class="input">
+          <label>Category</label><select name="category" class="input">
+            {% for cat in categories %}<option value="{{ cat }}" {{ 'selected' if embed and embed.category==cat else '' }}>{{ cat }}</option>{% endfor %}
+            <option value="general">general</option>
+          </select>
+          <label>Embed JSON</label>
+          <textarea name="embed_json" class="input code-area" rows="16" id="embed-json">{{ embed.embed_data|tojson(indent=2) if embed and embed.embed_data else '{\n  "title": "",\n  "description": "",\n  "color": 16711680,\n  "fields": []\n}' }}</textarea>
+          <button type="submit" class="btn btn-red mt-2">Save</button>
+        </form>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-header">Preview</div>
+        <div class="card-body" id="embed-preview"><p class="muted">Edit the JSON to see a preview</p></div>
+      </div>
+      {% if embed %}
+      <div class="card mt-3">
+        <div class="card-header">Push to Discord</div>
+        <div class="card-body">
+          <form method="post" action="/staff/embed/{{ embed.id }}/push">
+            <label>Channel ID</label><input type="text" name="channel_id" value="{{ embed.channel_id or '' }}" class="input" required>
+            <button type="submit" class="btn btn-green mt-2">Push</button>
+          </form>
+        </div>
+      </div>
+      <!-- INTERACTIONS (buttons/dropdowns) -->
+      <div class="card mt-3">
+        <div class="card-header">Interactions / Buttons</div>
+        <div class="card-body">
+          {% set interactions = embed.get('interactions_list', []) if embed.get else [] %}
+          {% for ix in interactions %}
+          <div class="list-row">
+            <span class="badge">{{ ix.interaction_type }}</span>
+            <span>{{ ix.emoji }} {{ ix.label }} <span class="muted">({{ ix.custom_id }})</span></span>
+            <span class="badge badge-{{ 'active' if ix.enabled else 'resolved' }}">{{ 'On' if ix.enabled else 'Off' }}</span>
+            <span class="muted">{{ ix.action_type }}: {{ ix.action_value[:20] }}</span>
+            <form method="post" action="/staff/interaction/{{ ix.id }}/toggle" class="inline-form">
+              <input type="hidden" name="embed_id" value="{{ embed.id }}">
+              <button type="submit" class="btn btn-xs">Toggle</button>
+            </form>
+            <form method="post" action="/staff/interaction/{{ ix.id }}/delete" class="inline-form" onsubmit="return confirm('Delete?')">
+              <input type="hidden" name="embed_id" value="{{ embed.id }}">
+              <button type="submit" class="btn btn-xs btn-danger">Del</button>
+            </form>
+          </div>
+          {% endfor %}
+          <details class="mt-3"><summary class="btn btn-sm">Add Interaction</summary>
+            <form method="post" action="/staff/embed/{{ embed.id }}/interaction/add" class="mt-2">
+              <div class="grid-2">
+                <div><label>Type</label><select name="interaction_type" class="input"><option value="button">Button</option><option value="dropdown">Dropdown</option></select></div>
+                <div><label>Custom ID</label><input type="text" name="custom_id" required class="input" placeholder="e.g. role_verify"></div>
+              </div>
+              <div class="grid-2">
+                <div><label>Label</label><input type="text" name="label" required class="input" placeholder="Button text"></div>
+                <div><label>Emoji</label><input type="text" name="emoji" class="input" placeholder="e.g. &#x2705;"></div>
+              </div>
+              <div class="grid-2">
+                <div><label>Style</label><select name="style" class="input"><option value="primary">Primary (Blue)</option><option value="success">Success (Green)</option><option value="danger">Danger (Red)</option><option value="secondary">Secondary (Grey)</option></select></div>
+                <div><label>Required Role ID</label><input type="text" name="required_role_id" class="input" placeholder="Leave blank for all"></div>
+              </div>
+              <div class="grid-2">
+                <div><label>Action Type</label><select name="action_type" class="input"><option value="role_toggle">Toggle Role</option><option value="role_add">Add Role</option><option value="role_remove">Remove Role</option><option value="send_dm">Send DM</option><option value="create_ticket">Create Ticket</option><option value="custom">Custom (bot handles)</option></select></div>
+                <div><label>Action Value</label><input type="text" name="action_value" class="input" placeholder="e.g. role_id, message"></div>
+              </div>
+              <button type="submit" class="btn btn-red mt-2">Add</button>
+            </form>
+          </details>
+        </div>
+      </div>
+      {% if embed.history %}
+      <div class="card mt-3">
+        <div class="card-header">Version History</div>
+        <div class="card-body">
+          {% for h in embed.history[:10] %}
+          <div class="list-row">
+            <span>v{{ h.version }} - {{ h.created_at|timeago }}</span>
+            <form method="post" action="/staff/embed/{{ embed.id }}/rollback" class="inline-form">
+              <input type="hidden" name="version_id" value="{{ h.id }}">
+              <button type="submit" class="btn btn-xs" onclick="return confirm('Rollback to v{{ h.version }}?')">Rollback</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <form method="post" action="/staff/embed/{{ embed.id }}/delete" class="mt-3" onsubmit="return confirm('Delete this embed permanently?')">
+        <button type="submit" class="btn btn-danger">Delete Embed</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+try{
+  var ta=document.getElementById('embed-json'),pv=document.getElementById('embed-preview');
+  function updatePreview(){try{var d=JSON.parse(ta.value);var h='<div class="embed-card" style="border-left:4px solid #'+(d.color?d.color.toString(16).padStart(6,'0'):'ff0000')+'">';
+  if(d.title)h+='<div class="embed-title">'+d.title+'</div>';if(d.description)h+='<div class="embed-desc">'+d.description+'</div>';
+  if(d.fields)d.fields.forEach(function(f){h+='<div class="embed-field"><strong>'+f.name+'</strong><p>'+f.value+'</p></div>';});
+  if(d.footer)h+='<div class="embed-footer">'+((d.footer.text)||'')+'</div>';h+='</div>';pv.innerHTML=h;}catch(e){pv.innerHTML='<p class="text-red">Invalid JSON</p>';}}
+  ta.addEventListener('input',updatePreview);updatePreview();
+}catch(e){}
+</script>
+{% endblock %}

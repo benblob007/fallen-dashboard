@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <div class="page-header"><h1 class="page-title">Notifications</h1>
+    <form method="post" action="/staff/notifications/read_all"><button type="submit" class="btn btn-sm">Mark All Read</button></form>
+  </div>
+  <div class="notif-list">
+    {% for n in notifications %}
+    <div class="notif-item {{ 'notif-unread' if not n.is_read else '' }}">
+      <div class="notif-header">
+        <span class="badge badge-{{ n.notif_type }}">{{ n.notif_type }}</span>
+        <span class="notif-title">{{ n.title }}</span>
+        <span class="muted">{{ n.created_at|timeago }}</span>
+      </div>
+      {% if n.message %}<p class="notif-msg">{{ n.message }}</p>{% endif %}
+      <div class="notif-actions">
+        {% if n.link %}<a href="{{ n.link }}" class="btn btn-xs">View</a>{% endif %}
+        {% if not n.is_read %}
+        <form method="post" action="/staff/notifications/read/{{ n.id }}" class="inline-form"><button type="submit" class="btn btn-xs">Mark Read</button></form>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}<p class="muted">No notifications</p>
+    {% endfor %}
+  </div>
+</div></div>
+{% endblock %}

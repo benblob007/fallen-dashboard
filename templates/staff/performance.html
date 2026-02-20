@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Staff Performance{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">Staff Performance</h1>
+  <p class="page-desc">Track staff contributions. Higher activity indicates more engaged moderators.</p>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Staff Member</th><th>Tier</th><th>Actions</th><th>Cases</th><th>Logins</th><th>Last Active</th></tr></thead>
+      <tbody>
+      {% for s in staff_performance %}
+      <tr>
+        <td><strong>{{ s.staff_name or s.staff_id }}</strong></td>
+        <td><span class="badge badge-tier-{{ s.permission_tier or 1 }}">T{{ s.permission_tier or 1 }}</span></td>
+        <td>{{ s.action_count or 0 }}</td>
+        <td>{{ s.case_count or 0 }}</td>
+        <td>{{ s.login_count or 0 }}</td>
+        <td>{% if s.last_active %}{{ s.last_active|timeago }}{% else %}<span class="muted">Never</span>{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No staff performance data yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div></div>
+{% endblock %}
