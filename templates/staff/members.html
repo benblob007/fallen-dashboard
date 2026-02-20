@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% block title %}Member Lookup{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">Member Lookup</h1>
+  <p class="page-desc">Search by Roblox username or Discord ID to view, manage, or take action on a member.</p>
+  <form action="/staff/members" method="get" class="search-form wide mb-4">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search username or Discord ID..." class="search-input" autofocus>
+    <button type="submit" class="btn btn-red">Search</button>
+  </form>
+  {% if results %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Member</th><th>Level</th><th>ELO</th><th>Warns</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in results %}
+      <tr class="clickable-row" onclick="location='/staff/member/{{ r.user_id }}'">
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            <img src="{{ r.avatar_url or 'https://cdn.discordapp.com/embed/avatars/' ~ (r.user_id|int % 5) ~ '.png' }}" class="avatar-sm" alt="">
+            <div>
+              <div style="font-weight:600">{{ r.roblox_username or 'Unknown' }}</div>
+              <div class="muted text-sm">{{ r.user_id }}</div>
+            </div>
+          </div>
+        </td>
+        <td><strong>{{ r.level or 0 }}</strong> <span class="muted text-sm">({{ (r.xp or 0)|fnum }} XP)</span></td>
+        <td>
+          {% set er = elo_rank(r.elo_rating) %}
+          <span class="elo-badge" style="background:{{ er[2] }}15;color:{{ er[2] }};border:1px solid {{ er[2] }}30">{{ er[1] }} {{ r.elo_rating or 1000 }}</span>
+        </td>
+        <td>
+          {% if (r.warning_points or 0) > 10 %}<span class="badge badge-critical">{{ r.warning_points }} pts</span>
+          {% elif (r.warning_points or 0) > 5 %}<span class="badge badge-high">{{ r.warning_points }} pts</span>
+          {% elif (r.warning_points or 0) > 0 %}<span class="badge badge-medium">{{ r.warning_points }} pts</span>
+          {% else %}<span class="muted">0</span>{% endif %}
+        </td>
+        <td>
+          {% if r.verified %}<span class="badge badge-active">Verified</span>
+          {% else %}<span class="badge">Unverified</span>{% endif %}
+        </td>
+        <td><a href="/staff/member/{{ r.user_id }}" class="btn btn-sm">View →</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif query %}<div class="empty-state"><p>No results for "<strong>{{ query }}</strong>". Try a Discord ID or Roblox username.</p></div>
+  {% else %}<div class="empty-state"><p>Enter a username or Discord ID above to search.</p></div>{% endif %}
+</div></div>
+{% endblock %}

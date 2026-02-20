@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% block title %}Duel Disputes{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Duel Disputes</h1>
+      <p class="page-desc">Review disputed duel results. Open disputes require staff resolution before ELO adjustments take effect.</p>
+    </div>
+    <button onclick="document.getElementById('create-dispute').style.display='block'" class="btn btn-red">File Dispute</button>
+  </div>
+
+  <div class="filter-bar mb-4">
+    <a href="/staff/disputes" class="btn btn-sm {{ 'btn-red' if not filter_status else '' }}">All</a>
+    <a href="/staff/disputes?status=open" class="btn btn-sm {{ 'btn-red' if filter_status=='open' else '' }}">Open</a>
+    <a href="/staff/disputes?status=resolved" class="btn btn-sm {{ 'btn-red' if filter_status=='resolved' else '' }}">Resolved</a>
+    <a href="/staff/disputes?status=rejected" class="btn btn-sm {{ 'btn-red' if filter_status=='rejected' else '' }}">Rejected</a>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>Filed By</th><th>Challenger</th><th>Opponent</th><th>Reason</th><th>Status</th><th>Filed</th></tr></thead>
+      <tbody>
+      {% for d in disputes %}
+      <tr class="clickable-row" onclick="location='/staff/dispute/{{ d.id }}'">
+        <td>#{{ d.id }}</td>
+        <td>{{ d.filed_by_name or d.filed_by }}</td>
+        <td>{{ d.challenger_id }}</td>
+        <td>{{ d.opponent_id }}</td>
+        <td>{{ (d.reason or '')[:50] }}{% if (d.reason or '')|length > 50 %}...{% endif %}</td>
+        <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+        <td>{{ d.created_at|timeago }}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">No disputes found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="create-dispute" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-content">
+      <h2>File Duel Dispute</h2>
+      <p class="muted text-sm mb-3">File on behalf of a member whose duel result was incorrect or unfair.</p>
+      <form method="post" action="/staff/disputes/create">
+        <label>Challenger ID</label><input type="text" name="challenger_id" class="input" required placeholder="Discord User ID">
+        <label>Opponent ID</label><input type="text" name="opponent_id" class="input" required placeholder="Discord User ID">
+        <label>Reason</label><textarea name="reason" class="input" rows="3" required placeholder="Describe the dispute..."></textarea>
+        <label>Evidence (optional)</label><textarea name="evidence" class="input" rows="2" placeholder="Links to screenshots, messages, etc."></textarea>
+        <button type="submit" class="btn btn-red mt-3">Submit Dispute</button>
+      </form>
+    </div>
+  </div>
+</div></div>
+{% endblock %}

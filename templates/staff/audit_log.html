@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">📝 Audit Log</h1>
+
+    {% if logs %}
+    <table class="lb-table">
+        <thead><tr><th>Action</th><th>Staff</th><th>Target</th><th>Details</th><th>When</th></tr></thead>
+        <tbody>{% for l in logs %}<tr>
+            <td class="audit-action">{{ l.action }}</td>
+            <td>{{ l.staff_name or '?' }}</td>
+            <td>{% if l.target_id %}<a href="/staff/member/{{ l.target_id }}">{{ l.target_id }}</a>{% else %}—{% endif %}</td>
+            <td class="audit-details">{{ (l.details or '—')[:100] }}</td>
+            <td>{{ l.created_at|timeago if l.created_at else '' }}</td>
+        </tr>{% endfor %}</tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><h2>No Logs</h2><p>No audit entries yet.</p></div>
+    {% endif %}
+</div></div>
+{% endblock %}
