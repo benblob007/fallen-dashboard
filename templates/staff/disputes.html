@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% block title %}Duel Disputes{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <div class="page-header"><h1 class="page-title">Duel Disputes</h1>
+    <button onclick="document.getElementById('create-dispute').style.display='block'" class="btn btn-red">File Dispute</button>
+  </div>
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  <div class="filter-bar mb-4">
+    <a href="/staff/disputes" class="btn btn-sm {{ 'btn-red' if not filter_status else '' }}">All</a>
+    <a href="/staff/disputes?status=open" class="btn btn-sm {{ 'btn-red' if filter_status=='open' else '' }}">Open</a>
+    <a href="/staff/disputes?status=resolved" class="btn btn-sm {{ 'btn-red' if filter_status=='resolved' else '' }}">Resolved</a>
+    <a href="/staff/disputes?status=rejected" class="btn btn-sm {{ 'btn-red' if filter_status=='rejected' else '' }}">Rejected</a>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>Filed By</th><th>Challenger</th><th>Opponent</th><th>Reason</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>
+      {% for d in disputes %}
+      <tr class="clickable-row" onclick="location='/staff/dispute/{{ d.id }}'">
+        <td>#{{ d.id }}</td><td>{{ d.filed_by_name or '?' }}</td>
+        <td>{{ d.challenger_id }}</td><td>{{ d.opponent_id }}</td>
+        <td>{{ (d.reason or '')[:50] }}</td>
+        <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+        <td>{{ d.created_at|timeago }}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="muted">No disputes filed</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="create-dispute" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-content">
+      <h2>File Duel Dispute</h2>
+      <form method="post" action="/staff/disputes/create">
+        <label>Challenger ID</label><input type="number" name="challenger_id" required class="input">
+        <label>Opponent ID</label><input type="number" name="opponent_id" required class="input">
+        <label>Reason</label><textarea name="reason" class="input" rows="3" required></textarea>
+        <label>Evidence (links, notes)</label><textarea name="evidence" class="input" rows="2"></textarea>
+        <button type="submit" class="btn btn-red mt-2">File Dispute</button>
+      </form>
+    </div>
+  </div>
+</div></div>
+{% endblock %}

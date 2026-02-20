@@ -1,0 +1,175 @@
+{% extends "base.html" %}{% block title %}Member: {{ member.roblox_username if member else '?' }}{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  {% if not member %}<p class="muted">Member not found.</p>
+  {% else %}
+  {% set m = member %}
+  <div class="member-header">
+    <img src="{{ m.avatar_url }}" class="avatar-lg">
+    <div>
+      <h1 class="page-title">{{ m.roblox_username or 'Unknown' }}</h1>
+      <div class="member-meta">
+        <span class="badge badge-rank">{{ rank_name }}</span>
+        <span class="muted">ID: {{ m.user_id }}</span>
+        <span class="muted">Level {{ m.level or 0 }}</span>
+        {% if m.verified %}<span class="badge badge-active">Verified</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="stat-row mb-4">
+    <div class="stat-box"><div class="stat-val">{{ (m.xp or 0)|fnum }}</div><div class="stat-label">XP</div></div>
+    <div class="stat-box"><div class="stat-val">{{ (m.coins or 0)|fnum }}</div><div class="stat-label">FC</div></div>
+    <div class="stat-box"><div class="stat-val">{{ m.elo_rating or 1000 }}</div><div class="stat-label">ELO</div></div>
+    <div class="stat-box"><div class="stat-val">{{ m.wins or 0 }}W/{{ m.losses or 0 }}L</div><div class="stat-label">Duels</div></div>
+    <div class="stat-box"><div class="stat-val">{{ m.messages or 0 }}</div><div class="stat-label">Messages</div></div>
+    <div class="stat-box"><div class="stat-val text-red">{{ m.warning_points or 0 }}</div><div class="stat-label">Warn Pts</div></div>
+  </div>
+
+  <!-- STAFF ACTIONS -->
+  <div class="card mb-4">
+    <div class="card-header">Quick Actions</div>
+    <div class="card-body">
+      <div class="action-tabs">
+        <button class="tab-btn active" onclick="showTab('warn')">Warn</button>
+        <button class="tab-btn" onclick="showTab('timeout')">Timeout</button>
+        <button class="tab-btn" onclick="showTab('xp')">XP/Coins</button>
+        <button class="tab-btn" onclick="showTab('elo')">ELO</button>
+        <button class="tab-btn" onclick="showTab('promote')">Promote</button>
+        {% if permission_tier >= 2 %}<button class="tab-btn" onclick="showTab('kick')">Kick</button>{% endif %}
+        {% if permission_tier >= 3 %}<button class="tab-btn" onclick="showTab('ban')">Ban</button>{% endif %}
+      </div>
+      <div class="tab-content" id="tab-warn">
+        <form method="post" action="/staff/action/warn/{{ m.user_id }}">
+          <select name="category" class="input"><option value="">Select category...</option>
+          {% for k, v in warn_categories.items() %}<option value="{{ k }}">{{ v.name }} ({{ v.points }}pts)</option>{% endfor %}</select>
+          <input type="text" name="reason" class="input mt-2" placeholder="Reason">
+          <button type="submit" class="btn btn-red mt-2">Warn</button>
+        </form>
+      </div>
+      <div class="tab-content hidden" id="tab-timeout">
+        <form method="post" action="/staff/action/timeout/{{ m.user_id }}">
+          <select name="duration" class="input"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="1440">24 hours</option></select>
+          <input type="text" name="reason" class="input mt-2" placeholder="Reason">
+          <button type="submit" class="btn btn-red mt-2">Timeout</button>
+        </form>
+      </div>
+      <div class="tab-content hidden" id="tab-xp">
+        <div class="grid-2">
+          <form method="post" action="/staff/action/adjust_xp/{{ m.user_id }}"><label>XP</label><input type="number" name="amount" class="input" placeholder="+/- amount"><button type="submit" class="btn btn-sm mt-2">Adjust XP</button></form>
+          <form method="post" action="/staff/action/adjust_coins/{{ m.user_id }}"><label>FC</label><input type="number" name="amount" class="input" placeholder="+/- amount"><input type="text" name="reason" class="input mt-1" placeholder="Reason"><button type="submit" class="btn btn-sm mt-2">Adjust Coins</button></form>
+        </div>
+      </div>
+      <div class="tab-content hidden" id="tab-elo">
+        <form method="post" action="/staff/action/set_elo/{{ m.user_id }}"><input type="number" name="elo" value="{{ m.elo_rating or 1000 }}" class="input"><button type="submit" class="btn btn-sm mt-2">Set ELO</button></form>
+      </div>
+      <div class="tab-content hidden" id="tab-promote">
+        <form method="post" action="/staff/action/promote/{{ m.user_id }}">
+          <label>New Rank</label><input type="text" name="new_rank" class="input" placeholder="e.g. Veteran, Elite">
+          <input type="text" name="reason" class="input mt-2" placeholder="Reason">
+          <button type="submit" class="btn btn-green mt-2">Change Rank</button>
+        </form>
+      </div>
+      <div class="tab-content hidden" id="tab-kick">
+        <form method="post" action="/staff/action/kick/{{ m.user_id }}"><input type="text" name="reason" class="input" placeholder="Reason"><button type="submit" class="btn btn-danger mt-2">Kick</button></form>
+      </div>
+      <div class="tab-content hidden" id="tab-ban">
+        <form method="post" action="/staff/action/ban/{{ m.user_id }}"><input type="text" name="reason" class="input" placeholder="Reason"><button type="submit" class="btn btn-danger mt-2" onclick="return confirm('Permanently ban this user?')">Ban</button></form>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- STAFF NOTES -->
+    <div class="card">
+      <div class="card-header">Staff Notes ({{ staff_notes|length }})</div>
+      <div class="card-body">
+        <form method="post" action="/staff/note/add/{{ m.user_id }}" class="mb-3">
+          <textarea name="note" class="input" rows="2" placeholder="Add a private note..." required></textarea>
+          <button type="submit" class="btn btn-sm mt-1">Add Note</button>
+        </form>
+        {% for n in staff_notes %}
+        <div class="note-item {{ 'note-pinned' if n.pinned else '' }}">
+          <div class="note-header">
+            <span>{{ n.staff_name }} {{ '(pinned)' if n.pinned else '' }}</span>
+            <span class="muted">{{ n.created_at|timeago }}</span>
+          </div>
+          <p>{{ n.note }}</p>
+          <div class="note-actions">
+            <form method="post" action="/staff/note/pin/{{ n.id }}" class="inline-form"><input type="hidden" name="user_id" value="{{ m.user_id }}"><button type="submit" class="btn btn-xs">{{ 'Unpin' if n.pinned else 'Pin' }}</button></form>
+            <form method="post" action="/staff/note/delete/{{ n.id }}" class="inline-form" onsubmit="return confirm('Delete?')"><input type="hidden" name="user_id" value="{{ m.user_id }}"><button type="submit" class="btn btn-xs btn-danger">Del</button></form>
+          </div>
+        </div>
+        {% else %}<p class="muted">No notes</p>{% endfor %}
+      </div>
+    </div>
+    <!-- MOD CASES -->
+    <div class="card">
+      <div class="card-header">Mod Cases ({{ mod_cases|length }})</div>
+      <div class="card-body">
+        {% for c in mod_cases[:10] %}
+        <a href="/staff/case/{{ c.id }}" class="list-row">
+          <span class="badge badge-{{ c.status }}">{{ c.case_type }}</span>
+          <span>{{ (c.reason or '...')[:40] }}</span>
+          <span class="muted">{{ c.created_at|timeago }}</span>
+        </a>
+        {% else %}<p class="muted">No mod cases</p>{% endfor %}
+        {% if mod_cases|length > 10 %}<a href="/staff/cases?q={{ m.user_id }}" class="btn btn-sm mt-2">View All</a>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2 mt-4">
+    <!-- WARNINGS -->
+    <div class="card">
+      <div class="card-header">Warnings ({{ warn_data.total_points }} pts)</div>
+      <div class="card-body">
+        {% for w in (warn_data.warnings or [])[-10:] %}
+        <div class="list-row">
+          <span class="badge">{{ w.category or '?' }}</span>
+          <span>{{ w.reason or 'No reason' }}</span>
+          <span class="muted">{{ w.warned_at|timeago if w.warned_at else '' }}</span>
+          <form method="post" action="/staff/action/remove_warn/{{ m.user_id }}" class="inline-form">
+            <input type="hidden" name="warning_id" value="{{ loop.index0 }}">
+            <button type="submit" class="btn btn-xs btn-danger">Remove</button>
+          </form>
+        </div>
+        {% else %}<p class="muted">No warnings</p>{% endfor %}
+      </div>
+    </div>
+    <!-- RANK HISTORY -->
+    <div class="card">
+      <div class="card-header">Rank History</div>
+      <div class="card-body">
+        {% for r in rank_history %}
+        <div class="list-row">
+          <span>{{ r.old_rank or '?' }} &rarr; {{ r.new_rank }}</span>
+          <span class="muted">{{ r.reason }}</span>
+          <span class="muted">{{ r.created_at|timeago }}</span>
+        </div>
+        {% else %}<p class="muted">No rank changes</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {% if duel_history %}
+  <div class="card mt-4">
+    <div class="card-header">Recent Duels</div>
+    <div class="card-body">
+      {% for d in duel_history %}
+      <div class="list-row"><span>vs {{ d.opponent_name or '?' }}</span>
+        <span class="badge badge-{{ 'active' if d.winner|string == m.user_id|string else 'resolved' }}">{{ 'Win' if d.winner|string == m.user_id|string else 'Loss' }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function showTab(t){document.querySelectorAll('.tab-content').forEach(e=>e.classList.add('hidden'));document.getElementById('tab-'+t).classList.remove('hidden');document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));event.target.classList.add('active');}
+</script>
+{% endblock %}

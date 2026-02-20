@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% block title %}Rewards{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <div class="page-header"><h1 class="page-title">Reward Mappings</h1>
+    <button onclick="document.getElementById('add-reward').style.display='block'" class="btn btn-red">Add Reward</button>
+  </div>
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Trigger</th><th>Value</th><th>Reward</th><th>Value</th><th>Cooldown</th><th>Active</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for r in rewards %}
+      <tr>
+        <td>{{ r.trigger_type }}</td><td>{{ r.trigger_value }}</td>
+        <td>{{ r.reward_type }}</td><td>{{ r.reward_value }}</td>
+        <td>{{ r.cooldown_hours }}h</td>
+        <td><span class="badge badge-{{ 'active' if r.active else 'resolved' }}">{{ 'Active' if r.active else 'Disabled' }}</span></td>
+        <td>
+          <form method="post" action="/staff/rewards/toggle/{{ r.id }}" class="inline-form"><button type="submit" class="btn btn-xs">Toggle</button></form>
+          <form method="post" action="/staff/rewards/delete/{{ r.id }}" class="inline-form" onsubmit="return confirm('Delete?')"><button type="submit" class="btn btn-xs btn-danger">Del</button></form>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="muted">No reward mappings</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="add-reward" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-content">
+      <h2>Add Reward Mapping</h2>
+      <form method="post" action="/staff/rewards/add">
+        <div class="grid-2">
+          <div><label>Trigger Type</label><select name="trigger_type" class="input"><option value="level">Level</option><option value="rank">Rank</option><option value="xp">XP Threshold</option><option value="event">Event</option><option value="achievement">Achievement</option></select></div>
+          <div><label>Trigger Value</label><input type="text" name="trigger_value" class="input" placeholder="e.g. 10, Elite"></div>
+        </div>
+        <div class="grid-2">
+          <div><label>Reward Type</label><select name="reward_type" class="input"><option value="xp">XP</option><option value="coins">Coins</option><option value="role">Role</option><option value="item">Item</option><option value="badge">Badge</option></select></div>
+          <div><label>Reward Value</label><input type="text" name="reward_value" class="input" placeholder="e.g. 500, role_id"></div>
+        </div>
+        <label>Description</label><input type="text" name="description" class="input">
+        <label>Cooldown (hours, 0=once)</label><input type="number" name="cooldown" value="0" class="input">
+        <button type="submit" class="btn btn-red mt-2">Add</button>
+      </form>
+    </div>
+  </div>
+</div></div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Member Search{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">🔍 Member Search</h1>
+    <form action="/staff/members" method="get" class="search-form wide"><input type="text" name="q" value="{{ query }}" placeholder="Search by Roblox username or Discord ID..." class="search-input"><button type="submit" class="btn">Search</button></form>
+    {% if results %}
+    <table class="lb-table" style="margin-top:16px">
+        <thead><tr><th>Avatar</th><th>Roblox</th><th>Level</th><th>XP</th><th>ELO</th><th>Coins</th><th>Verified</th><th></th></tr></thead>
+        <tbody>{% for r in results %}<tr>
+            <td><img src="{{ r.avatar_url or 'https://cdn.discordapp.com/embed/avatars/' ~ (r.user_id|int % 5) ~ '.png' }}" class="lb-avatar" alt=""></td>
+            <td>{{ r.roblox_username or '—' }}</td><td>{{ r.level or 0 }}</td><td>{{ (r.xp or 0)|fnum }}</td><td>{{ r.elo_rating or 1000 }}</td><td>{{ (r.coins or 0)|fnum }}</td>
+            <td>{% if r.verified %}✓{% else %}—{% endif %}</td><td><a href="/staff/member/{{ r.user_id }}" class="btn btn-sm">View</a></td>
+        </tr>{% endfor %}</tbody>
+    </table>
+    {% elif query %}<p class="empty-text" style="margin-top:16px">No results for "{{ query }}".</p>{% endif %}
+</div></div>
+{% endblock %}
