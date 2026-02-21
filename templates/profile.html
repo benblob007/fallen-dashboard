@@ -1,0 +1,111 @@
+{% extends "base.html" %}{% block title %}Profile{% endblock %}
+{% block content %}
+{% if not user %}<div class="center-msg"><h2>Login Required</h2><p class="muted">Login to view your profile and stats.</p><a href="/auth/login" class="btn btn-red">Login with Discord</a></div>
+{% elif not profile %}<div class="center-msg"><h2>Profile Not Found</h2><p class="muted">Your Discord account is not linked to any clan member data yet. Join the server and interact to create your profile.</p></div>
+{% else %}
+{% set p = profile %}
+<div class="profile-page">
+  <!-- HEADER -->
+  <div class="profile-header">
+    <img src="{{ p.avatar_url or 'https://cdn.discordapp.com/embed/avatars/' ~ (p.user_id|int % 5) ~ '.png' }}" class="avatar-xl">
+    <div>
+      <h1>{{ p.roblox_username or user.username }}</h1>
+      <div class="profile-meta">
+        <span class="badge badge-rank">{{ rank_name or 'Unranked' }}</span>
+        <span>Level {{ p.level or 0 }}</span>
+        {% if p.stage_rank %}<span class="badge badge-gold">Roster #{{ p.stage_rank }}</span>{% endif %}
+        {% if p.verified %}<span class="badge badge-active">Verified</span>{% endif %}
+        {% if (p.warning_points or 0) > 0 %}<span class="badge badge-medium">{{ p.warning_points }} warn pts</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- XP BAR -->
+  <div class="xp-bar-container">
+    <div class="xp-bar" style="width:{{ level_progress(p.xp, p.level) }}%"></div>
+    <span class="xp-text">{{ (p.xp or 0)|fnum }} XP</span>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-row mb-4">
+    <div class="stat-box"><div class="stat-val" style="color:var(--gold)">{{ (p.coins or 0)|fnum }}</div><div class="stat-label">Fallen Coins</div></div>
+    <div class="stat-box">
+      {% set er = elo_rank(p.elo_rating) %}
+      <div class="stat-val" style="color:{{ er[2] }}">{{ p.elo_rating or 1000 }}</div>
+      <div class="stat-label">{{ er[0] }} ELO{% if elo_rank_pos %} (#{{ elo_rank_pos }}){% endif %}</div>
+    </div>
+    <div class="stat-box"><div class="stat-val">{{ p.wins or 0 }}W / {{ p.losses or 0 }}L</div><div class="stat-label">Duel Record</div></div>
+    <div class="stat-box"><div class="stat-val">{{ (p.messages or 0)|fnum }}</div><div class="stat-label">Messages</div></div>
+    <div class="stat-box"><div class="stat-val">{{ (p.voice_time or 0)|ftime }}</div><div class="stat-label">Voice Time</div></div>
+  </div>
+
+  <!-- ACHIEVEMENTS -->
+  {% set achievements = [] %}
+  {% if (p.level or 0) >= 10 %}{% set _ = achievements.append("Level 10+") %}{% endif %}
+  {% if (p.level or 0) >= 25 %}{% set _ = achievements.append("Level 25+") %}{% endif %}
+  {% if (p.level or 0) >= 50 %}{% set _ = achievements.append("Level 50+") %}{% endif %}
+  {% if (p.wins or 0) >= 5 %}{% set _ = achievements.append("5 Duel Wins") %}{% endif %}
+  {% if (p.wins or 0) >= 25 %}{% set _ = achievements.append("25 Duel Wins") %}{% endif %}
+  {% if (p.messages or 0) >= 500 %}{% set _ = achievements.append("500+ Messages") %}{% endif %}
+  {% if (p.messages or 0) >= 2000 %}{% set _ = achievements.append("2000+ Messages") %}{% endif %}
+  {% if p.verified %}{% set _ = achievements.append("Verified") %}{% endif %}
+  {% if p.stage_rank %}{% set _ = achievements.append("Stage Roster") %}{% endif %}
+  {% if achievements %}
+  <div class="card mb-4">
+    <div class="card-header">Achievements</div>
+    <div class="card-body">
+      <div class="achievement-grid">
+        {% for a in achievements %}<span class="achievement-badge">{{ a }}</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- CONTENT CARDS -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">Recent Duels</div>
+      <div class="card-body">
+        {% for d in duel_history %}
+        <div class="list-row"><span>vs {{ d.opponent_name or '?' }}</span>
+          <span class="badge badge-{{ 'active' if d.winner|string == p.user_id|string else 'cancelled' }}">{{ 'Win' if d.winner|string == p.user_id|string else 'Loss' }}</span></div>
+        {% else %}<p class="muted">No recent duels</p>{% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Rank History</div>
+      <div class="card-body">
+        {% for r in rank_history %}
+        <div class="list-row"><span>{{ r.old_rank or '?' }} &rarr; {{ r.new_rank }}</span><span class="muted text-sm">{{ r.created_at|timeago }}</span></div>
+        {% else %}<p class="muted">No rank changes</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {% if p.inventory_items %}
+  <div class="card mt-4"><div class="card-header">Inventory ({{ p.inventory_items|length }})</div><div class="card-body">
+    <div class="achievement-grid">
+      {% for item in p.inventory_items %}<span class="achievement-badge">{{ item.name }}</span>{% endfor %}
+    </div>
+  </div></div>
+  {% endif %}
+
+  {% if applications %}
+  <div class="card mt-4"><div class="card-header">My Applications</div><div class="card-body">
+    {% for a in applications %}
+    <div class="list-row">
+      <span style="flex:1"><strong>{{ a.position_title or '?' }}</strong></span>
+      <span class="app-status-badge status-{{ a.status }}">{{ a.status|title }}</span>
+      <span class="muted text-sm">{{ a.created_at|timeago }}</span>
+    </div>
+    {% endfor %}
+  </div></div>
+  {% endif %}
+
+  <div class="mt-4" style="display:flex;gap:8px">
+    <a href="/apply" class="btn btn-sm">Apply for Staff</a>
+    <a href="/economy" class="btn btn-sm">Shop</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
