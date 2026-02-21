@@ -320,7 +320,8 @@ async def staff_dashboard(request: Request):
         c["current_season"] = await db.get_current_season()
         apps = await db.get_applications("applied", 50); c["pending_apps"] = len(apps)
         disputes = await db.get_disputes("open", 50); c["open_disputes"] = len(disputes)
-    except: c.update(stats={}, recent_warnings=[], recent_audit=[], guardian={}, mod_stats={}, bot_status=None, current_season=None, pending_apps=0, open_disputes=0)
+        c["action_stats"] = await db.get_action_stats()
+    except: c.update(stats={}, recent_warnings=[], recent_audit=[], guardian={}, mod_stats={}, bot_status=None, current_season=None, pending_apps=0, open_disputes=0, action_stats={"pending":0,"done":0,"failed":0})
     ip = _get_ip(request)
     await db.add_audit(c["user"]["id"], c["user"].get("username","?"), "viewed_staff_dashboard", ip=ip)
     await db.update_staff_activity(c["user"]["id"], "Viewed dashboard")
@@ -1252,7 +1253,7 @@ async def force_reauth(r: Request, user_id: int):
 # ================================================
 @app.get("/api/health")
 async def api_health():
-    return {"status": "ok", "db": bool(db.pool), "version": "v5"}
+    return {"status": "ok", "db": bool(db.pool), "version": "v6"}
 
 @app.post("/api/bot/status")
 async def api_bot_status(request: Request):
@@ -1268,3 +1269,44 @@ async def api_notif_count(request: Request):
     user = auth.get_session(request)
     if not user: return {"count": 0}
     return {"count": await db.get_unread_count(user["id"])}
+
+@app.get("/api/bot/pending-actions")
+async def api_pending_actions():
+    """Bot polls this to get pending actions (alternative to direct DB polling)."""
+    try:
+        actions = await db.get_pending_actions_by_status("pending", 10)
+        return {"ok": True, "actions": [dict(a) for a in actions]}
+    except: return {"ok": False, "actions": []}
+
+@app.post("/api/bot/action-result")
+async def api_action_result(request: Request):
+    """Bot reports back action execution results."""
+    try:
+        data = await request.json()
+        aid = data.get("action_id")
+        status = data.get("status", "done")
+        result = data.get("result", "")
+        if aid:
+            await db.update_action_status(aid, status, result)
+        return {"ok": True}
+    except: return {"ok": False}
+
+@app.get("/api/bot/action-stats")
+async def api_action_stats():
+    """Get action queue statistics."""
+    try:
+        stats = await db.get_action_stats()
+        return {"ok": True, **stats}
+    except: return {"ok": False}
+
+# ================================================
+# ACTION QUEUE PAGE (staff)
+# ================================================
+@app.get("/staff/action-queue")
+async def staff_action_queue(r: Request, status: str = ""):
+    c = await _ctx(r)
+    if _require_tier(c, 1): return RedirectResponse("/?error=unauthorized")
+    c["filter_status"] = status
+    c["actions"] = await db.get_action_history_filtered(status=status or None, limit=50)
+    c["stats"] = await db.get_action_stats()
+    return templates.TemplateResponse("staff/action_queue.html", c)
