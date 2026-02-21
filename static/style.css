@@ -680,8 +680,10 @@ label { display: block; font-size: .85rem; font-weight: 500; margin: 8px 0 4px; 
 .site-footer { border-top: 1px solid rgba(192,57,43,.15); }
 
 /* Podium cards hover glow */
-.podium-card:hover { box-shadow: 0 0 16px rgba(192,57,43,.1), 0 4px 12px rgba(0,0,0,.2); }
-.podium-card.rank-1:hover { box-shadow: 0 0 20px rgba(243,156,18,.15), 0 4px 12px rgba(0,0,0,.2); }
+.podium-card:hover { box-shadow: 0 0 16px rgba(192,57,43,.1), 0 4px 12px rgba(0,0,0,.2); transform: translateY(-4px); }
+.podium-card.rank-1:hover { box-shadow: 0 0 24px rgba(243,156,18,.2), 0 8px 20px rgba(0,0,0,.25); }
+.podium-card.rank-2:hover { box-shadow: 0 0 20px rgba(192,192,192,.15), 0 8px 20px rgba(0,0,0,.25); }
+.podium-card.rank-3:hover { box-shadow: 0 0 20px rgba(205,127,50,.15), 0 8px 20px rgba(0,0,0,.25); }
 
 /* Input focus red ring */
 .input:focus, .search-input:focus { box-shadow: 0 0 0 3px rgba(231,76,60,.12), 0 0 16px rgba(231,76,60,.06); }
@@ -701,3 +703,46 @@ label { display: block; font-size: .85rem; font-weight: 500; margin: 8px 0 4px; 
 /* Smooth page transitions */
 .staff-content { animation: fade-in .25s ease; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Nav logo */
+.nav-logo { height: 28px; width: 28px; border-radius: 50%; margin-right: 8px; vertical-align: middle; object-fit: cover; }
+
+/* Fix podium hover - ALL 3 cards */
+.podium-card { transition: all .3s cubic-bezier(.4,0,.2,1); }
+
+/* Shop purchase cards */
+.shop-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; transition: all .25s ease; display: flex; flex-direction: column; gap: 8px; }
+.shop-card:hover { border-color: rgba(192,57,43,.3); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+.shop-card-name { font-weight: 600; font-size: .95rem; }
+.shop-card-desc { color: var(--muted); font-size: .8rem; line-height: 1.4; flex: 1; }
+.shop-card-price { font-size: 1.1rem; font-weight: 700; color: var(--gold); }
+.shop-card-type { font-size: .7rem; text-transform: uppercase; color: var(--muted); letter-spacing: .5px; }
+.shop-card .btn { margin-top: auto; }
+.shop-grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+
+/* Application card improvements */
+.apply-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.apply-card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.apply-card-body { padding: 20px; }
+.apply-position-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
+.apply-position-desc { color: var(--muted); font-size: .85rem; margin-bottom: 12px; }
+.apply-requirements { background: var(--bg3); border-radius: var(--radius-sm); padding: 12px; font-size: .8rem; color: var(--muted); margin-bottom: 12px; }
+.apply-requirements strong { color: var(--text); }
+.app-status-badge { display: inline-flex; align-items: center; gap: 6px; }
+.app-status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+.app-status-badge.status-applied::before { background: var(--gold); }
+.app-status-badge.status-accepted::before { background: var(--green); }
+.app-status-badge.status-denied::before { background: var(--red); }
+.app-status-badge.status-waitlisted::before { background: var(--blue); }
+.app-status-badge.status-interview::before { background: var(--purple); }
+
+/* Toast/popup notifications */
+.toast { position: fixed; top: 80px; right: 20px; z-index: 9999; padding: 14px 20px; border-radius: var(--radius); background: var(--bg2); border: 1px solid var(--border); box-shadow: 0 8px 32px rgba(0,0,0,.4); animation: toast-in .3s ease; max-width: 400px; }
+.toast-success { border-left: 4px solid var(--green); }
+.toast-error { border-left: 4px solid var(--red); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+.toast-close { position: absolute; top: 8px; right: 12px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; }
+
+/* Profile achievements section */
+.achievement-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.achievement-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-full); font-size: .8rem; }
