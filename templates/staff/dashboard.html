@@ -1,0 +1,118 @@
+{% extends "base.html" %}{% block title %}Staff Dashboard{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">Command Center</h1>
+  <p class="page-desc">Overview of clan health, pending actions, and recent activity.</p>
+
+  <!-- PULSE: What's happening right now -->
+  {% set s = stats or {} %}
+  <div class="stat-row mb-4">
+    <div class="stat-box"><div class="stat-val">{{ (s.total_users or 0)|fnum }}</div><div class="stat-label">Members</div></div>
+    <div class="stat-box"><div class="stat-val">{{ s.active_24h or 0 }}</div><div class="stat-label">Active Today</div></div>
+    <div class="stat-box"><div class="stat-val">{{ s.active_7d or 0 }}</div><div class="stat-label">Active 7d</div></div>
+    <div class="stat-box">
+      <div class="stat-val">
+        {% if bot_status %}<span class="status-dot status-{{ bot_status.status }}"></span>{% endif %}
+        {{ bot_status.latency_ms or '—' }}{% if bot_status %}ms{% endif %}
+      </div>
+      <div class="stat-label">Bot Latency</div>
+    </div>
+  </div>
+
+  <!-- ACTION REQUIRED: What needs attention -->
+  <h2 class="section-title mt-4">Action Required</h2>
+  <p class="section-desc">Items that need staff attention right now.</p>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" class="mb-4">
+    {% set ms = mod_stats or {} %}
+    <a href="/staff/cases?status=active" class="card card-hover" style="text-decoration:none">
+      <div class="card-body" style="text-align:center">
+        <div class="stat-val text-red">{{ ms.active or 0 }}</div>
+        <div class="stat-label">Open Cases</div>
+      </div>
+    </a>
+    <a href="/staff/recruitment" class="card card-hover" style="text-decoration:none">
+      <div class="card-body" style="text-align:center">
+        <div class="stat-val text-gold">{{ pending_apps or 0 }}</div>
+        <div class="stat-label">Pending Apps</div>
+      </div>
+    </a>
+    <a href="/staff/disputes" class="card card-hover" style="text-decoration:none">
+      <div class="card-body" style="text-align:center">
+        <div class="stat-val text-blue">{{ open_disputes or 0 }}</div>
+        <div class="stat-label">Open Disputes</div>
+      </div>
+    </a>
+    <a href="/staff/action-queue?status=pending" class="card card-hover" style="text-decoration:none">
+      <div class="card-body" style="text-align:center">
+        {% set as = action_stats or {} %}
+        <div class="stat-val {% if (as.pending or 0) > 5 %}text-red{% elif (as.pending or 0) > 0 %}text-gold{% else %}text-green{% endif %}">{{ as.pending or 0 }}</div>
+        <div class="stat-label">Queued Actions {% if (as.failed or 0) > 0 %}<span class="badge badge-critical" style="font-size:.6rem">{{ as.failed }} failed</span>{% endif %}</div>
+      </div>
+    </a>
+  </div>
+
+  {% if current_season %}
+  <div class="card card-highlight mb-4">
+    <div class="card-body"><strong>Active Season:</strong> {{ current_season.season_name }} (S{{ current_season.season_number }}) <a href="/staff/seasons" class="btn btn-sm" style="margin-left:8px">Manage</a></div>
+  </div>
+  {% endif %}
+
+  <!-- ACTIVITY: Recent events -->
+  <hr class="page-divider">
+  <h2 class="section-title">Recent Activity</h2>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">Recent Warnings</div>
+      <div class="card-body">
+        {% for w in (recent_warnings or [])[:6] %}
+        <div class="list-row">
+          <span>{{ w.roblox_username or w.user_id or '?' }}</span>
+          <span class="badge badge-{{ 'high' if w.category in ['exploiting','threats_harassment'] else 'medium' }}">{{ w.category or '?' }}</span>
+          <span class="muted">{{ w.warned_at|timeago if w.warned_at else '' }}</span>
+        </div>
+        {% else %}<p class="muted">No recent warnings</p>{% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Staff Actions</div>
+      <div class="card-body">
+        {% for a in (recent_audit or [])[:6] %}
+        <div class="list-row">
+          <span class="audit-action">{{ a.staff_name or '?' }}</span>
+          <span class="audit-details">{{ a.action }}</span>
+          <span class="muted">{{ a.created_at|timeago }}</span>
+        </div>
+        {% else %}<p class="muted">No recent activity</p>{% endfor %}
+        <a href="/staff/audit" class="btn btn-ghost btn-sm mt-3">View Full Log →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- GUARDIAN + QUICK ACTIONS -->
+  <div class="grid-2 mt-4">
+    <div class="card">
+      <div class="card-header">Guardian Status</div>
+      <div class="card-body">
+        {% set g = guardian or {} %}
+        <div class="mini-stats">
+          <span>Commands: <strong>{{ g.commands_today or 0 }}</strong></span>
+          <span>Errors: <strong class="{{ 'text-red' if (g.errors_today or 0) > 5 else '' }}">{{ g.errors_today or 0 }}</strong></span>
+          <span>Flags: <strong class="{{ 'text-gold' if (g.active_abuse_flags or 0) > 0 else '' }}">{{ g.active_abuse_flags or 0 }}</strong></span>
+        </div>
+        <a href="/staff/guardian" class="btn btn-ghost btn-sm mt-3">Details →</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Quick Actions</div>
+      <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="/staff/search" class="btn btn-sm">Search</a>
+        <a href="/staff/events" class="btn btn-sm">Events</a>
+        <a href="/staff/embeds" class="btn btn-sm">Embeds</a>
+        <a href="/staff/tournaments" class="btn btn-sm">Tournaments</a>
+        <a href="/staff/settings" class="btn btn-sm">Settings</a>
+      </div>
+    </div>
+  </div>
+</div></div>
+{% endblock %}

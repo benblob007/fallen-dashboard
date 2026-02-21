@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% block title %}Recruitment{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Recruitment {% if pending_count %}<span class="badge badge-pending">{{ pending_count }} pending</span>{% endif %}</h1>
+      <p class="page-desc">Manage open positions and review applications. Vote on candidates as a team.</p>
+    </div>
+    <button onclick="document.getElementById('create-pos').style.display='block'" class="btn btn-red">New Position</button>
+  </div>
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+
+  <h2 class="section-title mt-3">Open Positions</h2>
+  <div class="table-wrap mb-4">
+    <table class="data-table">
+      <thead><tr><th>Position</th><th>Status</th><th>Max Applicants</th><th></th></tr></thead>
+      <tbody>
+      {% for p in positions %}
+      <tr>
+        <td><strong>{{ p.title }}</strong></td>
+        <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+        <td>{{ p.max_applicants or 'Unlimited' }}</td>
+        <td>
+          {% if p.status == 'open' %}<form method="post" action="/staff/recruitment/position/{{ p.id }}/close" class="inline-form"><button type="submit" class="btn btn-xs" onclick="return confirm('Close this position?')">Close</button></form>
+          {% else %}<form method="post" action="/staff/recruitment/position/{{ p.id }}/reopen" class="inline-form"><button type="submit" class="btn btn-xs btn-green">Reopen</button></form>{% endif %}
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="muted" style="text-align:center;padding:20px">No positions created yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section-title">Applications</h2>
+  <p class="section-desc">Review submitted applications and cast your vote.</p>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>Applicant</th><th>Position</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+      <tbody>
+      {% for a in applications %}
+      <tr class="clickable-row" onclick="location='/staff/application/{{ a.id }}'">
+        <td>#{{ a.id }}</td>
+        <td>{{ a.user_id }}</td>
+        <td>{{ a.position_title or '?' }}</td>
+        <td><span class="badge badge-{{ a.status }}">{{ a.status }}</span></td>
+        <td>{{ a.created_at|timeago }}</td>
+        <td><a href="/staff/application/{{ a.id }}" class="btn btn-xs">Review →</a></td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">No applications submitted yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="create-pos" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-content">
+      <h2>Create Position</h2>
+      <p class="muted text-sm mb-3">This will be visible on the public clan page for members to apply.</p>
+      <form method="post" action="/staff/recruitment/position/create">
+        <label>Title</label><input type="text" name="title" required class="input" placeholder="e.g. Moderator, Event Host, Raid Leader">
+        <label>Description</label><textarea name="description" class="input" rows="3" placeholder="What does this role involve?"></textarea>
+        <label>Requirements</label><textarea name="requirements" class="input" rows="2" placeholder="e.g. Level 15+, 2 weeks active, good standing"></textarea>
+        <label>Max Applicants (0 = unlimited)</label><input type="number" name="max_applicants" value="0" class="input">
+        <button type="submit" class="btn btn-red mt-3">Create Position</button>
+      </form>
+    </div>
+  </div>
+</div></div>
+{% endblock %}

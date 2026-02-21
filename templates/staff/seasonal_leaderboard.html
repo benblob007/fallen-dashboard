@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block title %}Season Leaderboard{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">{{ season.season_name if season else 'Season' }} Leaderboard</h1>
+  {% if not season %}<p class="muted">Season not found or has no archived data.</p>
+  {% else %}
+  <div class="filter-bar mb-4">
+    <a href="/staff/seasons/{{ season.id }}/leaderboard?sort=xp" class="btn btn-sm {{ 'btn-red' if sort=='xp' else '' }}">XP</a>
+    <a href="/staff/seasons/{{ season.id }}/leaderboard?sort=level" class="btn btn-sm {{ 'btn-red' if sort=='level' else '' }}">Level</a>
+    <a href="/staff/seasons/{{ season.id }}/leaderboard?sort=coins" class="btn btn-sm {{ 'btn-red' if sort=='coins' else '' }}">Coins</a>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Player</th><th>XP</th><th>Level</th><th>Coins</th><th>Messages</th></tr></thead>
+      <tbody>
+      {% for p in players %}
+      <tr><td>{{ loop.index }}</td><td>{{ p.roblox_username or 'Unknown' }}</td><td>{{ (p.xp or 0)|fnum }}</td><td>{{ p.level or 0 }}</td><td>{{ (p.coins or 0)|fnum }}</td><td>{{ (p.messages or 0)|fnum }}</td></tr>
+      {% else %}<tr><td colspan="6" class="muted">No archived data for this season</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div></div>
+{% endblock %}

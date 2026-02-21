@@ -1,0 +1,118 @@
+{% extends "base.html" %}{% block title %}Activity Tracking{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <h1 class="page-title">Activity Tracking</h1>
+  <p class="page-desc">Monitor member engagement and identify who's contributing — and who's gone quiet.</p>
+
+  {% set a = activity or {} %}
+  <!-- PULSE — Headline numbers with context -->
+  <div class="stat-row mb-4">
+    <div class="stat-box"><div class="stat-val">{{ (a.msg_total or 0)|fnum }}</div><div class="stat-label">Total Messages</div></div>
+    <div class="stat-box"><div class="stat-val">{{ (a.voice_total or 0)|ftime }}</div><div class="stat-label">Total Voice</div></div>
+    <div class="stat-box">
+      <div class="stat-val {% if (a.active_7d or 0) < 20 %}text-red{% elif (a.active_7d or 0) < 50 %}text-gold{% else %}text-green{% endif %}">{{ a.active_7d or 0 }}</div>
+      <div class="stat-label">Active (7d)</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val">{{ a.active_30d or 0 }}</div>
+      <div class="stat-label">Active (30d)</div>
+    </div>
+  </div>
+
+  <!-- INSIGHT BANNER -->
+  {% if (a.active_7d or 0) > 0 and (a.active_30d or 0) > 0 %}
+  {% set retention = ((a.active_7d or 0) / (a.active_30d or 1) * 100)|int %}
+  <div class="card card-highlight mb-4">
+    <div class="card-body">
+      <strong>Retention insight:</strong> {{ retention }}% of your 30-day active members were also active this week.
+      {% if retention < 40 %}<span class="text-red"> Engagement is dropping — consider running events or raids.</span>
+      {% elif retention > 70 %}<span class="text-green"> Strong retention — your core community is highly engaged.</span>
+      {% else %}<span class="text-gold"> Average retention — steady but room for improvement.</span>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ACTIVITY LEADERBOARD -->
+  {% if activity_leaders %}
+  <div class="card mb-4">
+    <div class="card-header">Activity Score Leaderboard</div>
+    <div class="card-body">
+      <p class="muted text-sm mb-3">Score = Messages ×1 + Voice(min) ×0.5 + Duels ×5 + Raids ×10. Higher is more engaged.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>#</th><th>Member</th><th>Score</th><th>Messages</th><th>Voice</th><th>Duels</th><th>Raids</th><th>Level</th></tr></thead>
+          <tbody>
+          {% for u in activity_leaders %}
+          <tr class="clickable-row" onclick="location='/staff/member/{{ u.user_id }}'">
+            <td>{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</td>
+            <td><strong>{{ u.name }}</strong></td>
+            <td><span class="badge badge-gold">{{ u.score|fnum }}</span></td>
+            <td>{{ u.messages|fnum }}</td><td>{{ u.voice_minutes }}m</td>
+            <td>{{ u.duels }}</td><td>{{ u.raids }}</td><td>{{ u.level }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- BREAKDOWNS -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">Top Messagers</div>
+      <div class="card-body">
+        {% for u in (a.top_msg or [])[:10] %}
+        <div class="list-row">
+          <span style="width:20px;color:var(--muted)">{{ loop.index }}</span>
+          <a href="/staff/member/{{ u.user_id }}" style="flex:1">{{ u.name }}</a>
+          <span><strong>{{ u.messages|fnum }}</strong></span>
+        </div>
+        {% else %}<p class="muted">No message data yet.</p>{% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Top Voice</div>
+      <div class="card-body">
+        {% for u in (a.top_voice or [])[:10] %}
+        <div class="list-row">
+          <span style="width:20px;color:var(--muted)">{{ loop.index }}</span>
+          <a href="/staff/member/{{ u.user_id }}" style="flex:1">{{ u.name }}</a>
+          <span><strong>{{ u.voice_time|ftime }}</strong></span>
+        </div>
+        {% else %}<p class="muted">No voice data yet.</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- INACTIVE — Flag problems -->
+  {% if a.inactive_users %}
+  <div class="card mt-4">
+    <div class="card-header">
+      Inactive Members (14+ days)
+      <span class="badge badge-{{ 'critical' if (a.inactive_users or [])|length > 30 else 'high' if (a.inactive_users or [])|length > 15 else 'medium' }}">{{ (a.inactive_users or [])|length }} members</span>
+    </div>
+    <div class="card-body">
+      <p class="muted text-sm mb-3">These members haven't been active in over 2 weeks. Consider reaching out or reviewing their status.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Member</th><th>Level</th><th>Last Seen</th></tr></thead>
+          <tbody>
+          {% for u in a.inactive_users[:30] %}
+          <tr class="clickable-row" onclick="location='/staff/member/{{ u.user_id }}'">
+            <td><a href="/staff/member/{{ u.user_id }}">{{ u.name }}</a></td>
+            <td>{{ u.level }}</td>
+            <td><span class="text-red">{{ u.last_active|timeago }}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if (a.inactive_users or [])|length > 30 %}<p class="muted text-sm mt-2">Showing 30 of {{ (a.inactive_users or [])|length }}.</p>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div></div>
+{% endblock %}

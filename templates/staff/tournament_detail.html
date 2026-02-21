@@ -1,0 +1,112 @@
+{% extends "base.html" %}{% block title %}Tournament: {{ tournament.title if tournament else '?' }}{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+  {% if not tournament %}<p class="muted">Tournament not found.</p>
+  {% else %}
+  {% set t = tournament %}
+  <div class="page-header">
+    <h1 class="page-title">{{ t.title }} <span class="badge badge-{{ t.status }}">{{ t.status }}</span></h1>
+    <div>
+      {% if t.status == 'draft' %}
+      <form method="post" action="/staff/tournament/{{ t.id }}/status" class="inline-form">
+        <input type="hidden" name="status" value="active">
+        <button type="submit" class="btn btn-green" onclick="return confirm('Start tournament? This will generate a random bracket from all participants.')">Start (Generate Bracket)</button>
+      </form>
+      {% elif t.status == 'active' %}
+      <form method="post" action="/staff/tournament/{{ t.id }}/status" class="inline-form">
+        <input type="hidden" name="status" value="completed">
+        <button type="submit" class="btn btn-red">Complete Tournament</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="detail-grid">
+        <div><span class="label">Bracket Size</span><span>{{ t.bracket_size }}</span></div>
+        <div><span class="label">Entry Fee</span><span>{{ t.entry_fee }} FC</span></div>
+        <div><span class="label">Prize Pool</span><span>{{ t.prize_pool or 'TBD' }}</span></div>
+        <div><span class="label">Participants</span><span>{{ (t.participants or [])|length }}</span></div>
+        {% if t.entry_requirement %}<div><span class="label">Requirement</span><span>{{ t.entry_requirement }}</span></div>{% endif %}
+        {% if t.match_rules %}<div><span class="label">Rules</span><span>{{ t.match_rules }}</span></div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if t.status == 'draft' %}
+  <!-- ADD PLAYERS (draft phase) -->
+  <div class="card mb-4">
+    <div class="card-header">Add Player</div>
+    <div class="card-body">
+      <form method="post" action="/staff/tournament/{{ t.id }}/add_player" class="inline-form" style="display:flex;gap:8px">
+        <input type="number" name="user_id" placeholder="Discord User ID" required class="input" style="flex:1">
+        <button type="submit" class="btn btn-red">Add</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- BRACKET DISPLAY -->
+  {% set bracket = t.bracket %}
+  {% if bracket and bracket is mapping and bracket.rounds %}
+  <h2 class="section-title">Bracket</h2>
+  <div class="bracket-container">
+    {% for rnd in bracket.rounds %}
+    <div class="bracket-round">
+      <div class="bracket-round-title">{{ rnd.name }}</div>
+      {% for m in rnd.matches %}
+      <div class="bracket-match {{ 'match-complete' if m.winner else '' }}">
+        <div class="bracket-player {{ 'bracket-winner' if m.player1 and m.winner == m.player1.user_id else '' }}">
+          {% if m.player1 %}{{ m.player1.name }} <span class="muted">[{{ m.player1.seed }}]</span>{% else %}<span class="muted">TBD</span>{% endif %}
+        </div>
+        <div class="bracket-vs">vs</div>
+        <div class="bracket-player {{ 'bracket-winner' if m.player2 and m.winner == m.player2.user_id else '' }}">
+          {% if m.player2 %}{{ m.player2.name }} <span class="muted">[{{ m.player2.seed }}]</span>{% else %}<span class="muted">TBD</span>{% endif %}
+        </div>
+        {% if m.score %}<div class="bracket-score">{{ m.score }}</div>{% endif %}
+        {% if t.status == 'active' and m.player1 and m.player2 and not m.winner %}
+        <form method="post" action="/staff/tournament/{{ t.id }}/match_result" class="bracket-form">
+          <input type="hidden" name="round_num" value="{{ rnd.round_num }}">
+          <input type="hidden" name="match_id" value="{{ m.match_id }}">
+          <input type="text" name="score" placeholder="Score" class="input-xs">
+          <select name="winner_id" class="input-xs">
+            <option value="{{ m.player1.user_id }}">{{ m.player1.name }}</option>
+            <option value="{{ m.player2.user_id }}">{{ m.player2.name }}</option>
+          </select>
+          <button type="submit" class="btn btn-xs btn-green">Record</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- PARTICIPANTS LIST -->
+  <h2 class="section-title mt-4">Participants ({{ (t.participants or [])|length }})</h2>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Seed</th><th>Player</th><th>ELO</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for p in (t.participants or []) %}
+      <tr>
+        <td>{{ p.seed or '-' }}</td>
+        <td><a href="/staff/member/{{ p.user_id }}">{{ p.roblox_username or 'Unknown' }}</a></td>
+        <td>{{ p.elo_rating or 1000 }}</td>
+        <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+        <td>{% if p.status == 'active' and t.status != 'completed' %}
+          <form method="post" action="/staff/tournament/{{ t.id }}/disqualify" class="inline-form" onsubmit="return confirm('Disqualify this player?')">
+            <input type="hidden" name="user_id" value="{{ p.user_id }}"><button type="submit" class="btn btn-xs btn-danger">DQ</button>
+          </form>{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="muted">No participants. Add players above.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div></div>
+{% endblock %}
