@@ -939,6 +939,19 @@ class DashboardDB:
         return await self._qall("SELECT * FROM pending_dashboard_actions ORDER BY created_at DESC LIMIT $1", limit)
     async def get_transactions(self, user_id=None, limit=50):
         return await self._qall("SELECT * FROM pending_dashboard_actions WHERE action_type IN ('add_coins','add_xp') ORDER BY created_at DESC LIMIT $1", limit)
+    async def get_pending_actions_by_status(self, status="pending", limit=10):
+        return await self._qall("SELECT * FROM pending_dashboard_actions WHERE status=$1 ORDER BY created_at ASC LIMIT $2", status, limit)
+    async def update_action_status(self, action_id, status, result=""):
+        await self._exec("UPDATE pending_dashboard_actions SET status=$2, result=$3, executed_at=NOW() WHERE id=$1", action_id, status, result)
+    async def get_action_stats(self):
+        rows = await self._qall("SELECT status, COUNT(*) as cnt FROM pending_dashboard_actions GROUP BY status")
+        stats = {r["status"]: r["cnt"] for r in rows}
+        total = sum(stats.values())
+        return {"total": total, "pending": stats.get("pending", 0), "done": stats.get("done", 0), "failed": stats.get("failed", 0)}
+    async def get_action_history_filtered(self, status=None, limit=50):
+        if status:
+            return await self._qall("SELECT * FROM pending_dashboard_actions WHERE status=$1 ORDER BY created_at DESC LIMIT $2", status, limit)
+        return await self._qall("SELECT * FROM pending_dashboard_actions ORDER BY created_at DESC LIMIT $1", limit)
 
     # == LEVEL BG ==
     async def set_user_bg(self, user_id, bg_key):
