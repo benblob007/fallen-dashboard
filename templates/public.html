@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% block title %}THE FALLEN - Clan Profile{% endblock %}
+{% block content %}
+<div class="public-page">
+  <div class="public-hero">
+    <img src="/static/fallen-logo.png" class="public-logo" alt="THE FALLEN">
+    <h1>THE FALLEN</h1>
+    <p class="muted">Elite Gaming Clan</p>
+  </div>
+  {% set s = stats or {} %}
+  <div class="stat-row mb-4">
+    <div class="stat-box"><div class="stat-val">{{ (s.total_users or 0)|fnum }}</div><div class="stat-label">Members</div></div>
+    <div class="stat-box"><div class="stat-val">{{ s.active_7d or 0 }}</div><div class="stat-label">Active (7d)</div></div>
+    {% set wr = war_record or {} %}
+    <div class="stat-box"><div class="stat-val">{{ wr.wins or 0 }}W - {{ wr.losses or 0 }}L</div><div class="stat-label">War Record</div></div>
+    <div class="stat-box"><div class="stat-val">{{ s.max_level or 0 }}</div><div class="stat-label">Highest Level</div></div>
+  </div>
+  {% if current_season %}
+  <div class="card mb-4 card-highlight"><div class="card-body"><strong>Current Season:</strong> {{ current_season.season_name }}</div></div>
+  {% endif %}
+  {% if roster %}
+  <div class="card mb-4"><div class="card-header">Stage Roster</div><div class="card-body">
+    <div class="roster-grid">
+      {% for slot in roster %}
+      <div class="roster-slot {{ 'filled' if slot.filled else 'empty' }}">
+        <span class="roster-num">#{{ slot.slot }}</span>
+        {% if slot.filled %}<span>{{ slot.name }}</span>{% else %}<span class="muted">Empty</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div></div>
+  {% endif %}
+  {% if top_players %}
+  <div class="card mb-4"><div class="card-header">Top Players</div><div class="card-body">
+    {% for p in top_players %}
+    <div class="list-row"><span class="badge badge-gold">#{{ loop.index }}</span><span>{{ p.roblox_username or 'Unknown' }}</span><span class="muted">Lvl {{ p.level or 0 }} / {{ (p.xp or 0)|fnum }} XP</span></div>
+    {% endfor %}
+  </div></div>
+  {% endif %}
+  {% if rules %}
+  <div class="card mb-4"><div class="card-header">Clan Rules</div><div class="card-body">
+    {% for r in rules %}
+    <div class="rule-section"><h3>{{ r.section_order }}. {{ r.section_title }}</h3><p>{{ r.content }}</p></div>
+    {% endfor %}
+  </div></div>
+  {% endif %}
+  {% if positions %}
+  <div class="card mb-4"><div class="card-header">Open Positions</div><div class="card-body">
+    {% for p in positions %}
+    <div class="list-row"><span>{{ p.title }}</span>{% if p.description %}<span class="muted">{{ p.description[:60] }}</span>{% endif %}
+    {% if user %}<a href="/apply" class="btn btn-sm btn-red">Apply</a>{% else %}<a href="/auth/login" class="btn btn-sm">Login to Apply</a>{% endif %}</div>
+    {% endfor %}
+  </div></div>
+  {% endif %}
+  <div class="center-msg"><a href="/auth/login" class="btn btn-red">Join the Fallen</a></div>
+</div>
+{% endblock %}
