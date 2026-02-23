@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% block title %}Bot Status{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Bot Status</h1>
+      <p class="page-desc">Real-time health of the Discord bot. Latency under 200ms is healthy.</p>
+    </div>
+    {% if permission_tier >= 3 %}
+    <form method="post" action="/staff/bot-status/restart" style="display:flex;gap:6px;align-items:center">
+      <input type="text" name="reason" class="input-xs" placeholder="Reason" style="width:160px">
+      <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Restart the bot? This will cause brief downtime.')">Restart Bot</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- BIG STATUS -->
+  {% if bot_status %}
+  <div class="stat-row mb-4">
+    <div class="stat-box" style="{% if bot_status.status == 'online' %}border-color:var(--green){% elif bot_status.status == 'degraded' %}border-color:var(--gold){% else %}border-color:var(--red){% endif %}">
+      <div class="stat-val"><span class="status-dot status-{{ bot_status.status }}"></span> {{ bot_status.status|title }}</div>
+      <div class="stat-label">Status</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val {% if (bot_status.latency_ms or 999) > 500 %}text-red{% elif (bot_status.latency_ms or 999) > 200 %}text-gold{% else %}text-green{% endif %}">{{ bot_status.latency_ms or '—' }}ms</div>
+      <div class="stat-label">Latency</div>
+    </div>
+    <div class="stat-box"><div class="stat-val">{{ bot_status.guild_count or '—' }}</div><div class="stat-label">Guilds</div></div>
+    <div class="stat-box"><div class="stat-val">{{ bot_status.member_count or '—' }}</div><div class="stat-label">Members</div></div>
+  </div>
+  <p class="muted text-sm mb-4">Last heartbeat: {{ bot_status.created_at|timeago }}</p>
+  {% else %}
+  <div class="card card-highlight mb-4"><div class="card-body"><span class="status-dot status-offline"></span> <strong>No status data.</strong> The bot may not be sending heartbeats to the dashboard.</div></div>
+  {% endif %}
+
+  <!-- STATUS HISTORY -->
+  <div class="card">
+    <div class="card-header">Status History</div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Status</th><th>Latency</th><th>Guilds</th><th>Members</th><th>Time</th></tr></thead>
+          <tbody>
+          {% for s in status_history %}
+          <tr>
+            <td><span class="status-dot status-{{ s.status }}"></span> {{ s.status }}</td>
+            <td>{{ s.latency_ms or '—' }}ms</td>
+            <td>{{ s.guild_count or '—' }}</td>
+            <td>{{ s.member_count or '—' }}</td>
+            <td>{{ s.created_at|timeago }}</td>
+          </tr>
+          {% else %}<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">No status history recorded.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div></div>
+{% endblock %}
