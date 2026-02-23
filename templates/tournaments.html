@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Tournaments{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">Tournaments</h2>
+    <p class="page-desc">Compete in single-elimination brackets. Join open tournaments or watch active ones live.</p>
+
+    {% if active %}
+    <h3 class="section-title mt-3" style="font-size:1.1rem">Live Tournaments</h3>
+    <div class="grid-2 mb-4">
+        {% for t in active %}
+        <a href="/tournament/{{ t.id }}" class="card card-hover" style="text-decoration:none">
+            <div class="card-body">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <strong style="font-size:1.05rem">{{ t.title }}</strong>
+                    <span class="badge badge-active">LIVE</span>
+                </div>
+                <div class="stat-row" style="gap:12px">
+                    <div><span class="stat-val" style="font-size:1rem">{{ t.bracket_size }}</span><span class="stat-label">Players</span></div>
+                    {% if t.prize_pool %}<div><span class="stat-val text-gold" style="font-size:1rem">{{ t.prize_pool[:20] }}</span><span class="stat-label">Prize</span></div>{% endif %}
+                </div>
+                <span class="muted text-sm">Started {{ t.started_at|timeago if t.started_at else 'recently' }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if upcoming %}
+    <h3 class="section-title mt-3" style="font-size:1.1rem">Open for Registration</h3>
+    <div class="grid-2 mb-4">
+        {% for t in upcoming %}
+        <a href="/tournament/{{ t.id }}" class="card card-hover" style="text-decoration:none">
+            <div class="card-body">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <strong style="font-size:1.05rem">{{ t.title }}</strong>
+                    <span class="badge badge-{{ 'pending' if t.status == 'open' else 'draft' }}">{{ 'OPEN' if t.status == 'open' else 'UPCOMING' }}</span>
+                </div>
+                <div class="stat-row" style="gap:12px">
+                    <div><span class="stat-val" style="font-size:1rem">{{ t.bracket_size }}</span><span class="stat-label">Spots</span></div>
+                    {% if t.entry_fee %}<div><span class="stat-val text-gold" style="font-size:1rem">{{ t.entry_fee }} FC</span><span class="stat-label">Entry Fee</span></div>{% endif %}
+                    {% if t.prize_pool %}<div><span class="stat-val" style="font-size:1rem">{{ t.prize_pool[:20] }}</span><span class="stat-label">Prize</span></div>{% endif %}
+                </div>
+                {% if t.entry_requirement %}<span class="muted text-sm">Requires: {{ t.entry_requirement }}</span>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if completed %}
+    <h3 class="section-title mt-3" style="font-size:1.1rem">Past Tournaments</h3>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Tournament</th><th>Size</th><th>Prize</th><th>Completed</th><th></th></tr></thead>
+            <tbody>
+            {% for t in completed %}
+            <tr>
+                <td><strong>{{ t.title }}</strong></td>
+                <td>{{ t.bracket_size }}</td>
+                <td>{{ t.prize_pool or '—' }}</td>
+                <td class="muted">{{ t.completed_at|timeago if t.completed_at else '?' }}</td>
+                <td><a href="/tournament/{{ t.id }}" class="btn btn-xs">View Bracket</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if not active and not upcoming and not completed %}
+    <div class="empty-state"><h3>No Tournaments Yet</h3><p>Staff will announce tournaments in Discord. Check back soon!</p></div>
+    {% endif %}
+</section>
+{% endblock %}
