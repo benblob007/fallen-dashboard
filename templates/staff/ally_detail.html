@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Edit Ally: {{ ally.server_name if ally else '?' }}{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+    {% if not ally %}<p class="muted">Ally not found.</p>
+    {% else %}
+    {% set a = ally %}
+    {% if success %}<div class="alert alert-success">{{ success|replace('_',' ')|title }}</div>{% endif %}
+
+    <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px">
+            {% if a.server_icon_url %}
+            <img src="{{ a.server_icon_url }}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+            {% else %}
+            <div style="width:48px;height:48px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:var(--red)">{{ a.server_name[0]|upper }}</div>
+            {% endif %}
+            <div>
+                <h1 class="page-title" style="margin-bottom:2px">{{ a.server_name }}</h1>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <span class="badge badge-{{ 'active' if a.status == 'active' else 'pending' if a.status == 'paused' else 'cancelled' }}">{{ a.status|upper }}</span>
+                    <span class="ally-tier-badge-sm tier-{{ a.tier }}">{{ a.tier|upper }}</span>
+                    <span class="ally-type-tag" style="font-size:.7rem">{{ a.ally_type }}</span>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+            {% if a.status == 'active' %}
+            <form method="post" action="/staff/allies/{{ a.id }}/pause" class="inline-form">
+                <button type="submit" class="btn btn-sm" onclick="return confirm('Pause this alliance?')">Pause</button>
+            </form>
+            <form method="post" action="/staff/allies/{{ a.id }}/remove" class="inline-form">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remove this alliance? This keeps the record for history.')">Remove</button>
+            </form>
+            {% elif a.status == 'paused' %}
+            <form method="post" action="/staff/allies/{{ a.id }}/reactivate" class="inline-form">
+                <button type="submit" class="btn btn-sm btn-green">Reactivate</button>
+            </form>
+            <form method="post" action="/staff/allies/{{ a.id }}/remove" class="inline-form">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remove?')">Remove</button>
+            </form>
+            {% elif a.status == 'removed' %}
+            <form method="post" action="/staff/allies/{{ a.id }}/reactivate" class="inline-form">
+                <button type="submit" class="btn btn-sm btn-green">Reactivate</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Edit Alliance Details</div>
+        <div class="card-body">
+            <form method="POST" action="/staff/allies/{{ a.id }}/edit" class="form-stack">
+                <div class="form-row-2">
+                    <div class="form-group"><label>Server Name</label><input type="text" name="server_name" value="{{ a.server_name }}" required class="input"></div>
+                    <div class="form-group"><label>Server Icon URL</label><input type="url" name="server_icon_url" value="{{ a.server_icon_url or '' }}" class="input"></div>
+                </div>
+                <div class="form-group"><label>Description</label><textarea name="description" rows="3" class="input">{{ a.description or '' }}</textarea></div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Invite Link</label><input type="url" name="invite_link" value="{{ a.invite_link or '' }}" class="input"></div>
+                    <div class="form-group"><label>Server Size</label><input type="number" name="server_size" value="{{ a.server_size or 0 }}" min="0" class="input"></div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Ally Type</label>
+                        <select name="ally_type" class="input">
+                            {% for t in ['friendly','strategic','event','recruitment','pvp'] %}
+                            <option value="{{ t }}" {{ 'selected' if a.ally_type == t else '' }}>{{ t|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Tier</label>
+                        <select name="tier" class="input">
+                            {% for t in ['bronze','silver','gold'] %}
+                            <option value="{{ t }}" {{ 'selected' if a.tier == t else '' }}>{{ t|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Contact Discord ID</label><input type="number" name="contact_discord_id" value="{{ a.contact_discord_id or 0 }}" class="input"></div>
+                    <div class="form-group"><label>Display Order</label><input type="number" name="display_order" value="{{ a.display_order or 0 }}" class="input"></div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Visibility</label>
+                        <select name="visibility" class="input">
+                            <option value="public" {{ 'selected' if a.visibility == 'public' else '' }}>Public</option>
+                            <option value="internal" {{ 'selected' if a.visibility == 'internal' else '' }}>Internal Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group"></div>
+                </div>
+                <div class="form-group"><label>Staff Notes (internal)</label><textarea name="notes" rows="2" class="input">{{ a.notes or '' }}</textarea></div>
+                <button type="submit" class="btn btn-red">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card">
+        <div class="card-header">History</div>
+        <div class="card-body" style="font-size:.85rem;line-height:1.8">
+            <div>Allied: <strong>{{ a.allied_at.strftime('%b %d, %Y') if a.allied_at else '?' }}</strong> {% if a.added_by %}by staff {{ a.added_by }}{% endif %}</div>
+            {% if a.paused_at %}<div style="color:var(--gold)">Paused: {{ a.paused_at.strftime('%b %d, %Y') }}</div>{% endif %}
+            {% if a.removed_at %}<div style="color:var(--red)">Removed: {{ a.removed_at.strftime('%b %d, %Y') }}</div>{% endif %}
+            {% if a.last_validated %}<div class="muted">Last validated: {{ a.last_validated|timeago }}</div>{% endif %}
+        </div>
+    </div>
+
+    <div class="mt-4"><a href="/staff/allies" class="btn btn-sm">&larr; All Allies</a></div>
+    {% endif %}
+</div></div>
+{% endblock %}

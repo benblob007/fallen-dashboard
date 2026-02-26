@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Staff: Tournaments{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+    <div class="page-header">
+        <h1 class="page-title">Tournament Management</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            {% if season %}<span class="season-badge">Season: {{ season.name }}</span>{% endif %}
+            {% if disputes %}<a href="/staff/tournament-disputes" class="btn btn-sm">Disputes <span class="notif-badge-sm">{{ disputes|length }}</span></a>{% endif %}
+            <a href="/staff/rankings" class="btn btn-sm">Rankings / Top 10</a>
+        </div>
+    </div>
+    {% if success %}<div class="alert alert-success">{{ success|replace('_',' ')|title }}</div>{% endif %}
+
+    <!-- Create Tournament -->
+    <details class="card mb-4">
+        <summary class="card-header" style="cursor:pointer;user-select:none">Create New Tournament</summary>
+        <div class="card-body">
+            <form method="POST" action="/staff/tournaments/create" class="form-stack">
+                <div class="form-row-2">
+                    <div class="form-group"><label>Tournament Name</label><input type="text" name="title" required class="input" placeholder="e.g. TSB 1v1 Championship"></div>
+                    <div class="form-group"><label>Game Mode</label><input type="text" name="game_mode" value="TSB" class="input"></div>
+                </div>
+                <div class="form-group"><label>Description</label><textarea name="description" rows="2" class="input" placeholder="Brief tournament description..."></textarea></div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Match Format</label>
+                        <select name="match_format" class="input">
+                            <option value="1v1">1v1 (Solo)</option>
+                            <option value="2v2">2v2 (Doubles)</option>
+                            <option value="3v3">3v3 (Triples)</option>
+                            <option value="4v4">4v4 (Squad)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Bracket Size</label>
+                        <select name="bracket_size" class="input">
+                            <option value="4">4 players</option>
+                            <option value="8" selected>8 players</option>
+                            <option value="16">16 players</option>
+                            <option value="32">32 players</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Best Of</label>
+                        <select name="best_of" class="input">
+                            <option value="1">Bo1</option>
+                            <option value="3">Bo3</option>
+                            <option value="5">Bo5</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Entry Type</label>
+                        <select name="entry_type" class="input">
+                            <option value="open">Open (Anyone)</option>
+                            <option value="clan">Clan Only</option>
+                            <option value="ally">Ally Only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label><input type="checkbox" name="is_ranked" style="margin-right:6px">Ranked (Affects Top 10)</label>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" name="screenshot_required" style="margin-right:6px">Screenshot Required</label>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label><input type="checkbox" name="checkin_required" style="margin-right:6px">Check-in Required</label>
+                    </div>
+                    <div class="form-group"><label>Check-in Window (min)</label><input type="number" name="checkin_minutes" value="30" class="input"></div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Entry Fee (FC)</label><input type="number" name="entry_fee" value="0" min="0" class="input"></div>
+                    <div class="form-group"><label>Timeout (min)</label><input type="number" name="timeout_minutes" value="15" class="input"></div>
+                </div>
+                <div class="form-group"><label>Prize Description</label><input type="text" name="prize_pool" class="input" placeholder="e.g. 500 Robux + Champion Role"></div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Prize (FC)</label><input type="number" name="prize_coins" value="0" min="0" class="input"></div>
+                    <div class="form-group"><label>Prize (Robux)</label><input type="number" name="prize_robux" value="0" min="0" class="input"></div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>No-Show Penalty (pts)</label><input type="number" name="no_show_penalty" value="0" class="input"></div>
+                    <div class="form-group"><label>Match Rules</label><input type="text" name="match_rules" class="input" placeholder="No abilities, standard stage..."></div>
+                </div>
+                <button type="submit" class="btn btn-red">Create Tournament</button>
+            </form>
+        </div>
+    </details>
+
+    <!-- Tournament List -->
+    {% set live = tournaments|selectattr('status','equalto','active')|list %}
+    {% set open_t = tournaments|selectattr('status','equalto','open')|list %}
+    {% set draft = tournaments|selectattr('status','equalto','draft')|list %}
+    {% set completed_t = tournaments|selectattr('status','equalto','completed')|list %}
+    {% set paused_t = tournaments|selectattr('status','equalto','paused')|list %}
+
+    {% if live %}
+    <h3 class="subsection-title"><span class="pulse-dot live"></span> Live</h3>
+    {% endif %}
+    {% for t in live %}
+    <div class="card mb-2 card-highlight" style="border-left-color:var(--green)">
+        <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <div>
+                <strong>{{ t.title }}</strong>
+                <span class="tourney-format-badge">{{ t.match_format or '1v1' }}</span>
+                {% if t.is_ranked %}<span class="tourney-ranked-badge">RANKED</span>{% endif %}
+                <span class="badge badge-active">LIVE</span>
+                <span class="muted text-sm ml-2">Bo{{ t.best_of or 1 }} · {{ t.bracket_size }} bracket</span>
+            </div>
+            <a href="/staff/tournament/{{ t.id }}" class="btn btn-red btn-sm">Manage →</a>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if open_t or draft %}
+    <h3 class="subsection-title mt-3">📋 Open / Draft</h3>
+    {% endif %}
+    {% for t in open_t + draft %}
+    <div class="card mb-2">
+        <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <div>
+                <strong>{{ t.title }}</strong>
+                <span class="tourney-format-badge">{{ t.match_format or '1v1' }}</span>
+                {% if t.is_ranked %}<span class="tourney-ranked-badge">RANKED</span>{% endif %}
+                <span class="badge badge-{{ 'pending' if t.status == 'open' else '' }}">{{ t.status|upper }}</span>
+            </div>
+            <a href="/staff/tournament/{{ t.id }}" class="btn btn-sm">Manage</a>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if completed_t %}
+    <h3 class="subsection-title mt-3" style="opacity:.6">📜 Completed</h3>
+    {% for t in completed_t[:10] %}
+    <div class="card mb-2" style="opacity:.6">
+        <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <div><strong>{{ t.title }}</strong> <span class="tourney-format-badge">{{ t.match_format or '1v1' }}</span> <span class="muted text-sm">{{ t.completed_at|timeago if t.completed_at else '' }}</span></div>
+            <a href="/staff/tournament/{{ t.id }}" class="btn btn-xs">View</a>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if not tournaments %}<div class="empty-state"><h3>No Tournaments</h3><p>Create your first tournament above.</p></div>{% endif %}
+</div></div>
+{% endblock %}

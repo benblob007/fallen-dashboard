@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Staff: Allies{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+    <div class="page-header">
+        <h1 class="page-title">Alliance Management</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            {% if (applications or [])|length %}
+            <a href="/staff/allies/applications" class="btn">Applications <span class="notif-badge-sm">{{ applications|length }}</span></a>
+            {% else %}
+            <a href="/staff/allies/applications" class="btn btn-sm">Applications</a>
+            {% endif %}
+            <form method="post" action="/staff/allies/push_embed" style="display:flex;gap:4px">
+                <input type="text" name="channel_id" placeholder="Channel ID" class="input" style="width:140px">
+                <button type="submit" class="btn btn-red" onclick="return confirm('Push allies embed to Discord?')">Push to Discord</button>
+            </form>
+        </div>
+    </div>
+
+    {% if success %}
+    <div class="alert alert-success">{{ success|replace('_',' ')|title }}</div>
+    {% endif %}
+
+    <!-- Stats -->
+    <div class="stat-row mb-4">
+        <div class="stat-box"><div class="stat-val">{{ stats.total or 0 }}</div><div class="stat-label">Total</div></div>
+        <div class="stat-box"><div class="stat-val" style="color:var(--green)">{{ stats.active or 0 }}</div><div class="stat-label">Active</div></div>
+        <div class="stat-box"><div class="stat-val" style="color:var(--gold)">{{ stats.paused or 0 }}</div><div class="stat-label">Paused</div></div>
+        <div class="stat-box"><div class="stat-val" style="color:var(--muted)">{{ stats.removed or 0 }}</div><div class="stat-label">Removed</div></div>
+    </div>
+
+    <!-- Add Ally -->
+    <details class="card mb-4">
+        <summary class="card-header" style="cursor:pointer;user-select:none">Add New Ally</summary>
+        <div class="card-body">
+            <form method="POST" action="/staff/allies/add" class="form-stack">
+                <div class="form-row-2">
+                    <div class="form-group"><label>Server Name</label><input type="text" name="server_name" required class="input"></div>
+                    <div class="form-group"><label>Server Icon URL</label><input type="url" name="server_icon_url" class="input" placeholder="https://..."></div>
+                </div>
+                <div class="form-group"><label>Description</label><textarea name="description" rows="2" class="input" placeholder="Short description of the allied server"></textarea></div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Invite Link</label><input type="url" name="invite_link" class="input" placeholder="https://discord.gg/..."></div>
+                    <div class="form-group"><label>Server Size</label><input type="number" name="server_size" value="0" min="0" class="input"></div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Ally Type</label>
+                        <select name="ally_type" class="input">
+                            <option value="friendly">Friendly</option>
+                            <option value="strategic">Strategic</option>
+                            <option value="event">Event Partner</option>
+                            <option value="recruitment">Recruitment</option>
+                            <option value="pvp">PvP Partner</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Alliance Tier</label>
+                        <select name="tier" class="input">
+                            <option value="bronze">Bronze</option>
+                            <option value="silver">Silver</option>
+                            <option value="gold">Gold</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group"><label>Contact Discord ID</label><input type="number" name="contact_discord_id" value="0" class="input"></div>
+                    <div class="form-group"><label>Visibility</label>
+                        <select name="visibility" class="input">
+                            <option value="public">Public</option>
+                            <option value="internal">Internal Only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group"><label>Staff Notes</label><textarea name="notes" rows="2" class="input" placeholder="Internal notes (not shown publicly)"></textarea></div>
+                <button type="submit" class="btn btn-red">Add Ally</button>
+            </form>
+        </div>
+    </details>
+
+    <!-- Allies List -->
+    {% if allies %}
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Order</th><th>Server</th><th>Type</th><th>Tier</th><th>Status</th><th>Visibility</th><th>Allied</th><th></th></tr></thead>
+            <tbody>
+            {% for a in allies %}
+            <tr style="{% if a.status == 'removed' %}opacity:.4{% elif a.status == 'paused' %}opacity:.6{% endif %}">
+                <td>{{ a.display_order or 0 }}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        {% if a.server_icon_url %}
+                        <img src="{{ a.server_icon_url }}" style="width:24px;height:24px;border-radius:50%;object-fit:cover">
+                        {% endif %}
+                        <strong>{{ a.server_name }}</strong>
+                    </div>
+                </td>
+                <td><span class="ally-type-tag" style="font-size:.7rem">{{ a.ally_type }}</span></td>
+                <td><span class="ally-tier-badge-sm tier-{{ a.tier or 'bronze' }}">{{ a.tier or 'bronze' }}</span></td>
+                <td><span class="badge badge-{{ 'active' if a.status == 'active' else 'pending' if a.status == 'paused' else 'cancelled' }}">{{ a.status }}</span></td>
+                <td class="muted text-sm">{{ a.visibility }}</td>
+                <td class="muted text-sm">{{ a.allied_at|timeago if a.allied_at else '?' }}</td>
+                <td><a href="/staff/allies/{{ a.id }}" class="btn btn-xs">Edit</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><h3>No Allies</h3><p>Add your first ally above or approve an application.</p></div>
+    {% endif %}
+</div></div>
+{% endblock %}

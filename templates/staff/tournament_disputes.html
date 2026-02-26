@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Staff: Match Disputes{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+    <div class="page-header">
+        <h1 class="page-title">⚖️ Match Disputes</h1>
+        <a href="/staff/tournaments" class="btn btn-sm">&larr; Tournaments</a>
+    </div>
+    {% if success %}<div class="alert alert-success">{{ success|replace('_',' ')|title }}</div>{% endif %}
+
+    {% set open_disputes = disputes|selectattr('status','equalto','open')|list %}
+    {% set resolved_disputes = disputes|rejectattr('status','equalto','open')|list %}
+
+    {% if open_disputes %}
+    <h3 class="subsection-title" style="color:var(--red)">Open Disputes ({{ open_disputes|length }})</h3>
+    {% for d in open_disputes %}
+    <div class="card mb-3 card-highlight">
+        <div class="card-body">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                <div>
+                    <strong>{{ d.tournament_title or 'Tournament #' ~ d.tournament_id }}</strong>
+                    <span class="muted text-sm">· Match #{{ d.match_id or '?' }}</span>
+                    <div class="muted text-sm">Filed by {{ d.filed_by_name or d.filed_by }} · {{ d.created_at|timeago if d.created_at else '?' }}</div>
+                </div>
+                <span class="badge badge-active">OPEN</span>
+            </div>
+            <div class="card" style="margin-bottom:10px"><div class="card-body" style="font-size:.85rem">{{ d.reason }}</div></div>
+            {% if d.evidence_url %}<div class="muted text-sm mb-2">Evidence: <a href="{{ d.evidence_url }}" target="_blank" class="link">{{ d.evidence_url[:50] }}...</a></div>{% endif %}
+            <form method="post" action="/staff/tournament-disputes/{{ d.id }}/resolve" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+                <div class="form-group" style="margin:0"><label class="text-sm">Resolution</label>
+                    <input type="text" name="resolution" required placeholder="Decision..." class="input" style="width:220px"></div>
+                <div class="form-group" style="margin:0"><label class="text-sm">Winner ID (override)</label>
+                    <input type="number" name="winner_id" value="0" class="input" style="width:140px"></div>
+                <button type="submit" class="btn btn-green btn-sm" onclick="return confirm('Resolve this dispute?')">Resolve</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if resolved_disputes %}
+    <h3 class="subsection-title mt-4" style="opacity:.6">Resolved ({{ resolved_disputes|length }})</h3>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Tournament</th><th>Filed By</th><th>Reason</th><th>Resolution</th><th>Resolved By</th><th>Date</th></tr></thead>
+            <tbody>
+            {% for d in resolved_disputes %}
+            <tr><td>{{ d.tournament_title or '#' ~ d.tournament_id }}</td>
+                <td class="text-sm">{{ d.filed_by_name or d.filed_by }}</td>
+                <td class="text-sm">{{ d.reason[:60] }}</td>
+                <td class="text-sm">{{ d.resolution or '—' }}</td>
+                <td class="muted text-sm">{{ d.resolved_by_name or '?' }}</td>
+                <td class="muted text-sm">{{ d.resolved_at|timeago if d.resolved_at else '?' }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if not open_disputes and not resolved_disputes %}
+    <div class="empty-state"><h3>No Disputes</h3><p>Match disputes appear here when players challenge results.</p></div>
+    {% endif %}
+</div></div>
+{% endblock %}

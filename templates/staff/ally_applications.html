@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Staff: Ally Applications{% endblock %}
+{% block content %}
+<div class="staff-layout">{% include "staff/_nav.html" %}
+<div class="staff-content">
+    <div class="page-header">
+        <h1 class="page-title">Ally Applications</h1>
+        <a href="/staff/allies" class="btn btn-sm">&larr; Alliance Management</a>
+    </div>
+
+    {% if success %}<div class="alert alert-success">{{ success|replace('_',' ')|title }}</div>{% endif %}
+
+    {% set pending = applications|selectattr('status','equalto','pending')|list %}
+    {% set reviewed = applications|rejectattr('status','equalto','pending')|list %}
+
+    {% if pending %}
+    <h3 class="section-title" style="font-size:1rem">Pending Review ({{ pending|length }})</h3>
+    {% for app in pending %}
+    <div class="card mb-3 card-highlight">
+        <div class="card-body">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+                <div>
+                    <h3 style="margin-bottom:4px">{{ app.server_name }}</h3>
+                    <div class="muted text-sm">Applied {{ app.created_at|timeago if app.created_at else '?' }} · {{ app.server_size or '?' }} members</div>
+                </div>
+                <span class="badge badge-pending">PENDING</span>
+            </div>
+
+            <div class="detail-grid mb-3" style="font-size:.85rem">
+                {% if app.invite_link %}<div><span class="label">Invite</span><a href="{{ app.invite_link }}" target="_blank" class="link">{{ app.invite_link[:40] }}...</a></div>{% endif %}
+                {% if app.contact_name %}<div><span class="label">Contact</span><span>{{ app.contact_name }} {% if app.contact_discord_id %}({{ app.contact_discord_id }}){% endif %}</span></div>{% endif %}
+            </div>
+
+            {% if app.reason %}
+            <div class="card" style="margin-bottom:10px"><div class="card-body" style="font-size:.85rem"><strong>Why they want to ally:</strong><br>{{ app.reason }}</div></div>
+            {% endif %}
+            {% if app.offering %}
+            <div class="card" style="margin-bottom:12px"><div class="card-body" style="font-size:.85rem"><strong>What they offer:</strong><br>{{ app.offering }}</div></div>
+            {% endif %}
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+                <form method="post" action="/staff/allies/applications/{{ app.id }}/approve" style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">
+                    <div class="form-group" style="margin:0"><label class="text-sm">Type</label>
+                        <select name="ally_type" class="input input-sm" style="width:110px">
+                            <option value="friendly">Friendly</option><option value="strategic">Strategic</option>
+                            <option value="event">Event</option><option value="recruitment">Recruitment</option><option value="pvp">PvP</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0"><label class="text-sm">Tier</label>
+                        <select name="tier" class="input input-sm" style="width:90px">
+                            <option value="bronze">Bronze</option><option value="silver">Silver</option><option value="gold">Gold</option>
+                        </select>
+                    </div>
+                    <input type="text" name="notes" placeholder="Notes (optional)" class="input input-sm" style="width:150px">
+                    <button type="submit" class="btn btn-green btn-sm" onclick="return confirm('Approve and create ally entry?')">Approve</button>
+                </form>
+                <form method="post" action="/staff/allies/applications/{{ app.id }}/deny" style="display:flex;gap:6px;align-items:flex-end">
+                    <input type="text" name="notes" placeholder="Denial reason" class="input input-sm" style="width:180px">
+                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Deny this application?')">Deny</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if reviewed %}
+    <h3 class="section-title mt-4" style="font-size:1rem">Reviewed ({{ reviewed|length }})</h3>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Server</th><th>Status</th><th>Reviewer</th><th>Notes</th><th>Date</th></tr></thead>
+            <tbody>
+            {% for app in reviewed %}
+            <tr>
+                <td><strong>{{ app.server_name }}</strong> <span class="muted text-sm">({{ app.server_size or '?' }} members)</span></td>
+                <td><span class="badge badge-{{ 'active' if app.status == 'approved' else 'cancelled' if app.status == 'denied' else '' }}">{{ app.status }}</span></td>
+                <td class="muted text-sm">{{ app.reviewer_name or '?' }}</td>
+                <td class="text-sm">{{ app.review_notes or '—' }}</td>
+                <td class="muted text-sm">{{ app.reviewed_at|timeago if app.reviewed_at else app.created_at|timeago }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if not pending and not reviewed %}
+    <div class="empty-state"><h3>No Applications</h3><p>Alliance applications will appear here when servers apply via the public form.</p></div>
+    {% endif %}
+</div></div>
+{% endblock %}
