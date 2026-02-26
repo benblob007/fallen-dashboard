@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Apply for Alliance{% endblock %}
+{% block content %}
+<section class="section" style="max-width:680px;margin:0 auto">
+    <h2 class="section-title">Apply for Alliance</h2>
+    <p class="page-desc">Interested in forming an alliance with The Fallen? Fill out the application below and our leadership team will review it.</p>
+
+    {% if success == 'submitted' %}
+    <div class="toast toast-success" id="toast">
+        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+        <strong>Application Submitted!</strong> Our team will review your application and reach out via Discord.
+    </div>
+    {% endif %}
+    {% if error %}
+    <div class="toast toast-error" id="toast">
+        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+        <strong>Error:</strong> {{ error|replace('_',' ')|title }}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="/allies/apply" class="form-stack">
+                <div class="form-group">
+                    <label>Server Name <span class="required">*</span></label>
+                    <input type="text" name="server_name" required placeholder="Your server name" class="input" minlength="2">
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Server Size</label>
+                        <input type="number" name="server_size" value="0" min="0" class="input" placeholder="Approximate member count">
+                    </div>
+                    <div class="form-group">
+                        <label>Discord Invite Link</label>
+                        <input type="url" name="invite_link" class="input" placeholder="https://discord.gg/...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Why do you want to ally with The Fallen? <span class="required">*</span></label>
+                    <textarea name="reason" rows="4" required class="input" minlength="10" placeholder="Tell us about your goals for this alliance..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>What does your server offer?</label>
+                    <textarea name="offering" rows="3" class="input" placeholder="Events, PvP, raids, recruitment, training, etc."></textarea>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Contact Discord ID</label>
+                        <input type="text" name="contact_discord_id" class="input" placeholder="Your Discord user ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Name</label>
+                        <input type="text" name="contact_name" class="input" placeholder="Your Discord username">
+                    </div>
+                </div>
+
+                <div class="form-info-box">
+                    <strong>What happens next?</strong>
+                    <p>Our leadership reviews all applications within 48 hours. If approved, you'll receive a Discord DM with next steps. We evaluate based on server activity, shared values, and mutual benefit.</p>
+                </div>
+
+                <button type="submit" class="btn btn-red" onclick="return confirm('Submit alliance application?')">Submit Application</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="mt-4"><a href="/allies" class="btn btn-sm">&larr; View Current Allies</a></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>setTimeout(() => { const t = document.getElementById('toast'); if(t){t.style.opacity='0';setTimeout(()=>{if(t)t.remove()},300)} }, 5000);</script>
+{% endblock %}

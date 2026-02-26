@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Rankings — Top 10{% endblock %}
+{% block content %}
+<section class="section">
+    <div class="rankings-hero">
+        <h2 class="section-title">Top 10 Rankings</h2>
+        <p class="page-desc">Competitive rankings powered by tournament performance.</p>
+        {% if season %}<div class="season-badge">Season: {{ season.name }}</div>{% endif %}
+        <div class="format-tabs">
+            <a href="/rankings?format=1v1" class="format-tab {{ 'active' if format == '1v1' else '' }}">1v1</a>
+            <a href="/rankings?format=2v2" class="format-tab {{ 'active' if format == '2v2' else '' }}">2v2</a>
+            <a href="/rankings?format=3v3" class="format-tab {{ 'active' if format == '3v3' else '' }}">3v3</a>
+        </div>
+    </div>
+
+    {% if rankings %}
+    <div class="ranking-list">
+        {% for r in rankings %}
+        <div class="ranking-card rank-{{ loop.index }} {% if loop.index <= 3 %}rank-top3{% endif %}" style="animation-delay: {{ loop.index * 0.06 }}s">
+            <div class="rank-position">
+                {% if loop.index == 1 %}<span class="rank-crown">👑</span>{% endif %}
+                <span class="rank-num">#{{ loop.index }}</span>
+            </div>
+            <div class="rank-avatar-wrap">
+                <img src="{{ r.avatar_url or '/static/default_avatar.png' }}" class="rank-avatar" alt="">
+                <div class="rank-tier-dot" style="background:{{ r.tier_color }}"></div>
+            </div>
+            <div class="rank-info">
+                <div class="rank-name">{{ r.roblox_username }}</div>
+                <div class="rank-meta">
+                    <span class="rank-tier-label" style="color:{{ r.tier_color }}">{{ r.tier }}</span>
+                    {% if r.clan_rank %}<span class="rank-clan">{{ r.clan_rank }}</span>{% endif %}
+                </div>
+            </div>
+            <div class="rank-stats">
+                <div class="rank-points">{{ r.points }}</div>
+                <div class="rank-wl">{{ r.wins }}W {{ r.losses }}L</div>
+            </div>
+            <div class="rank-progress-wrap">
+                <div class="rank-progress-bar">
+                    <div class="rank-progress-fill" style="width:{{ r.progress.progress }}%;background:{{ r.tier_color }}"></div>
+                </div>
+                {% if r.streak > 0 %}<span class="rank-streak streak-hot">🔥{{ r.streak }}</span>
+                {% elif r.streak < 0 %}<span class="rank-streak streak-cold">❄️{{ r.streak|abs }}</span>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Tier Legend -->
+    <div class="tier-legend">
+        <h4 style="font-size:.85rem;margin-bottom:8px;color:var(--muted)">Ranking Tiers</h4>
+        <div class="tier-legend-grid">
+            {% for threshold, name, color in tier_list %}
+            <div class="tier-legend-item">
+                <span class="tier-dot" style="background:{{ color }}"></span>
+                <span class="tier-name" style="color:{{ color }}">{{ name }}</span>
+                <span class="tier-pts">{{ threshold }}+</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No Rankings Yet</h3>
+        <p>Rankings are populated by <strong>ranked tournaments</strong>. Win matches to climb the ladder!</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

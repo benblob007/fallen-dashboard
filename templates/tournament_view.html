@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.title if tournament else 'Tournament' }}{% endblock %}
+{% block content %}
+<section class="section">
+{% if not tournament %}<div class="empty-state"><h3>Tournament not found.</h3></div>
+{% else %}
+{% set t = tournament %}
+    <!-- Hero -->
+    <div class="tourney-hero">
+        <div class="tourney-hero-top">
+            <span class="tourney-format-badge">{{ t.match_format or '1v1' }}</span>
+            {% if t.is_ranked %}<span class="tourney-ranked-badge">RANKED</span>{% endif %}
+            <span class="badge badge-{{ 'active' if t.status == 'active' else 'pending' if t.status == 'open' else 'cancelled' if t.status == 'completed' else '' }}">{{ t.status|upper }}</span>
+        </div>
+        <h2 class="tourney-hero-title">{{ t.title }}</h2>
+        {% if t.description %}<p class="tourney-hero-desc">{{ t.description }}</p>{% endif %}
+        <div class="tourney-info-grid">
+            <div class="tourney-info-item"><span class="tourney-info-label">Format</span><span>{{ t.match_format or '1v1' }} · Bo{{ t.best_of or 1 }}</span></div>
+            <div class="tourney-info-item"><span class="tourney-info-label">Bracket</span><span>{{ (t.participants or [])|length }}/{{ t.bracket_size }}</span></div>
+            {% if t.entry_fee %}<div class="tourney-info-item"><span class="tourney-info-label">Entry Fee</span><span>{{ t.entry_fee }} FC</span></div>{% endif %}
+            {% if t.prize_pool %}<div class="tourney-info-item"><span class="tourney-info-label">Prize</span><span>{{ t.prize_pool }}</span></div>{% endif %}
+            {% if t.prize_coins %}<div class="tourney-info-item"><span class="tourney-info-label">Prize (FC)</span><span>{{ t.prize_coins }}</span></div>{% endif %}
+            {% if t.match_rules %}<div class="tourney-info-item" style="grid-column:1/-1"><span class="tourney-info-label">Rules</span><span>{{ t.match_rules }}</span></div>{% endif %}
+        </div>
+
+        {% if user %}
+            {% if t.status in ('draft','open') %}
+                {% if is_joined %}
+                    {% if t.checkin_required and t.status == 'open' and not is_checked_in %}
+                    <form method="post" action="/tournament/{{ t.id }}/checkin" style="margin-top:12px">
+                        <button class="btn btn-green">Check In ✓</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="/tournament/{{ t.id }}/leave" style="margin-top:8px">
+                        <button class="btn btn-sm" onclick="return confirm('Leave tournament?')">Leave Tournament</button>
+                    </form>
+                {% else %}
+                    <form method="post" action="/tournament/{{ t.id }}/join" style="margin-top:12px">
+                        <button class="btn btn-red">Register Now{% if t.entry_fee %} ({{ t.entry_fee }} FC){% endif %}</button>
+                    </form>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            {% if t.status in ('draft','open') %}<a href="/auth/login" class="btn btn-red" style="margin-top:12px">Login to Register</a>{% endif %}
+        {% endif %}
+    </div>
+
+    <!-- Bracket -->
+    {% if t.bracket and t.status in ('active','completed','paused') %}
+    {% set bracket = t.bracket if t.bracket is mapping else {} %}
+    <div class="card mt-4">
+        <div class="card-header">Tournament Bracket</div>
+        <div class="card-body bracket-scroll">
+            <div class="bracket-container">
+            {% for rnd in (bracket.get('rounds') or []) %}
+                <div class="bracket-round">
+                    <div class="bracket-round-title">{{ rnd.name or ('Round ' ~ rnd.round_num) }}</div>
+                    {% for m in (rnd.get('matches') or []) %}
+                    <div class="bracket-match {{ 'match-complete' if m.winner else '' }}">
+                        <div class="bracket-player {{ 'bracket-winner' if m.player1 and m.winner == m.player1.get('user_id') else '' }}">
+                            {% if m.player1 %}
+                                {% if m.player1.get('avatar_url') %}<img src="{{ m.player1.avatar_url }}" class="bracket-avatar">{% endif %}
+                                <span class="bracket-seed">[{{ m.player1.seed }}]</span> {{ m.player1.name }}
+                                {% if m.get('p1_score') %}<span class="bracket-score-num">{{ m.p1_score }}</span>{% endif %}
+                            {% else %}<span class="muted">TBD</span>{% endif %}
+                        </div>
+                        <div class="bracket-player {{ 'bracket-winner' if m.player2 and m.winner == m.player2.get('user_id') else '' }}">
+                            {% if m.player2 %}
+                                {% if m.player2.get('avatar_url') %}<img src="{{ m.player2.avatar_url }}" class="bracket-avatar">{% endif %}
+                                <span class="bracket-seed">[{{ m.player2.seed }}]</span> {{ m.player2.name }}
+                                {% if m.get('p2_score') %}<span class="bracket-score-num">{{ m.p2_score }}</span>{% endif %}
+                            {% else %}<span class="muted">TBD</span>{% endif %}
+                        </div>
+                        {% if m.score %}<div class="bracket-score">{{ m.score }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Participants List -->
+    <div class="card mt-4">
+        <div class="card-header">Registered Players ({{ (t.participants or [])|length }})</div>
+        <div class="card-body">
+            {% if t.participants %}
+            <div class="participant-grid">
+                {% for p in t.participants if p.status == 'active' %}
+                <div class="participant-card">
+                    <img src="{{ p.avatar_url or '/static/default_avatar.png' }}" class="participant-avatar">
+                    <div>
+                        <div class="participant-name">{{ p.roblox_username }}</div>
+                        {% if p.clan_rank %}<div class="muted text-sm">{{ p.clan_rank }}</div>{% endif %}
+                        {% if p.seed %}<span class="muted text-sm">Seed #{{ p.seed }}</span>{% endif %}
+                        {% if t.is_ranked and p.ranking_points_change %}
+                        <span class="{{ 'text-green' if p.ranking_points_change > 0 else 'text-red' }}" style="font-size:.75rem">{{ '%+d'|format(p.ranking_points_change) }} pts</span>
+                        {% endif %}
+                    </div>
+                    {% if p.checked_in %}<span style="color:var(--green);font-size:.7rem">✓ Checked In</span>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}<p class="muted">No participants yet.</p>{% endif %}
+        </div>
+    </div>
+
+    <div class="mt-4"><a href="/tournaments" class="btn btn-sm">&larr; All Tournaments</a></div>
+{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Allied Servers{% endblock %}
+{% block content %}
+<section class="section">
+    <div class="allies-header">
+        <h2 class="section-title">Allied Servers</h2>
+        <p class="page-desc">Our trusted alliances forged through strength and loyalty.</p>
+        <a href="/allies/apply" class="btn btn-red">Apply for Alliance</a>
+    </div>
+
+    {% if active %}
+    <div class="allies-grid">
+        {% for a in active %}
+        <div class="ally-card ally-tier-{{ a.tier or 'bronze' }}" onclick="this.classList.toggle('ally-expanded')">
+            <div class="ally-card-inner">
+                <div class="ally-card-front">
+                    <div class="ally-icon-wrap">
+                        {% if a.server_icon_url %}
+                        <img src="{{ a.server_icon_url }}" alt="" class="ally-icon">
+                        {% else %}
+                        <div class="ally-icon ally-icon-placeholder">{{ a.server_name[0]|upper }}</div>
+                        {% endif %}
+                        <span class="ally-tier-badge tier-{{ a.tier or 'bronze' }}">{{ (a.tier or 'bronze')|upper }}</span>
+                    </div>
+                    <h3 class="ally-name">{{ a.server_name }}</h3>
+                    <span class="ally-type-tag">{{ a.ally_type|replace('_',' ')|title }}</span>
+                    {% if a.description %}
+                    <p class="ally-desc">{{ a.description[:120] }}{% if a.description|length > 120 %}...{% endif %}</p>
+                    {% endif %}
+                    <div class="ally-meta">
+                        {% if a.server_size %}<span>{{ a.server_size|int }} members</span>{% endif %}
+                        <span>Allied {{ a.allied_at|timeago if a.allied_at else 'recently' }}</span>
+                    </div>
+                </div>
+                <div class="ally-card-detail">
+                    {% if a.description %}<p style="margin-bottom:10px;font-size:.85rem">{{ a.description }}</p>{% endif %}
+                    {% if a.invite_link %}
+                    <a href="{{ a.invite_link }}" target="_blank" rel="noopener" class="btn btn-red btn-sm" onclick="event.stopPropagation()">
+                        Join Server
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if paused %}
+    <h3 class="section-title mt-4" style="font-size:1rem;opacity:.6">Paused Alliances</h3>
+    <div class="allies-grid allies-paused">
+        {% for a in paused %}
+        <div class="ally-card ally-paused">
+            <div class="ally-card-inner">
+                <div class="ally-card-front">
+                    <div class="ally-icon-wrap">
+                        {% if a.server_icon_url %}
+                        <img src="{{ a.server_icon_url }}" alt="" class="ally-icon">
+                        {% else %}
+                        <div class="ally-icon ally-icon-placeholder">{{ a.server_name[0]|upper }}</div>
+                        {% endif %}
+                        <span class="ally-status-badge badge-paused">PAUSED</span>
+                    </div>
+                    <h3 class="ally-name">{{ a.server_name }}</h3>
+                    <span class="ally-type-tag">{{ a.ally_type|replace('_',' ')|title }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not active and not paused %}
+    <div class="empty-state">
+        <h3>No Alliances Yet</h3>
+        <p>Be the first to forge an alliance with The Fallen.</p>
+        <a href="/allies/apply" class="btn btn-red">Apply for Alliance</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

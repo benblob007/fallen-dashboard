@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Tournaments{% endblock %}
+{% block content %}
+<section class="section">
+    <div class="tournaments-hero">
+        <h2 class="section-title">Tournaments</h2>
+        <p class="page-desc">Compete for glory, coins, and bragging rights.</p>
+        {% if season %}<div class="season-badge">Season: {{ season.name }}</div>{% endif %}
+    </div>
+
+    {% if active %}
+    <h3 class="subsection-title"><span class="pulse-dot live"></span> Live Now</h3>
+    <div class="tourney-grid">
+        {% for t in active %}
+        <a href="/tournament/{{ t.id }}" class="tourney-card tourney-live">
+            <div class="tourney-card-top">
+                <span class="tourney-status-badge badge-live">LIVE</span>
+                {% if t.is_ranked %}<span class="tourney-ranked-badge">RANKED</span>{% endif %}
+                <span class="tourney-format-badge">{{ t.match_format or '1v1' }}</span>
+            </div>
+            <h3 class="tourney-title">{{ t.title }}</h3>
+            {% if t.description %}<p class="tourney-desc">{{ t.description[:80] }}</p>{% endif %}
+            <div class="tourney-meta-row">
+                <span>🏆 {{ t.bracket_size }} bracket</span>
+                <span>⚔️ Bo{{ t.best_of or 1 }}</span>
+                {% if t.prize_pool %}<span>💰 {{ t.prize_pool }}</span>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if upcoming %}
+    <h3 class="subsection-title">📋 Open & Upcoming</h3>
+    <div class="tourney-grid">
+        {% for t in upcoming %}
+        <a href="/tournament/{{ t.id }}" class="tourney-card tourney-upcoming">
+            <div class="tourney-card-top">
+                <span class="tourney-status-badge badge-{{ t.status }}">{{ t.status|upper }}</span>
+                {% if t.is_ranked %}<span class="tourney-ranked-badge">RANKED</span>{% endif %}
+                <span class="tourney-format-badge">{{ t.match_format or '1v1' }}</span>
+            </div>
+            <h3 class="tourney-title">{{ t.title }}</h3>
+            {% if t.description %}<p class="tourney-desc">{{ t.description[:80] }}</p>{% endif %}
+            <div class="tourney-meta-row">
+                <span>🏆 {{ t.bracket_size }} players</span>
+                <span>⚔️ Bo{{ t.best_of or 1 }}</span>
+                {% if t.entry_fee %}<span>🪙 {{ t.entry_fee }} FC entry</span>{% endif %}
+            </div>
+            {% if t.status == 'open' %}<div class="tourney-cta">Register Now →</div>{% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if completed %}
+    <h3 class="subsection-title" style="opacity:.6">📜 Past Tournaments</h3>
+    <div class="tourney-grid tourney-past">
+        {% for t in completed[:6] %}
+        <a href="/tournament/{{ t.id }}" class="tourney-card tourney-completed">
+            <div class="tourney-card-top">
+                <span class="tourney-status-badge badge-completed">COMPLETED</span>
+                {% if t.is_ranked %}<span class="tourney-ranked-badge">RANKED</span>{% endif %}
+            </div>
+            <h3 class="tourney-title">{{ t.title }}</h3>
+            <div class="tourney-meta-row"><span>{{ t.completed_at|timeago if t.completed_at else 'Recently' }}</span></div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not active and not upcoming and not completed %}
+    <div class="empty-state"><h3>No Tournaments</h3><p>Check back soon.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

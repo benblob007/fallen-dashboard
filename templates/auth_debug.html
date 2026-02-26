@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Auth Debug{% endblock %}
+{% block content %}
+<section class="section">
+    <h2 class="section-title">Auth Debug</h2>
+    {% if not session %}
+    <div class="empty-state"><h2>Not Logged In</h2><a href="/auth/login" class="btn">Login with Discord</a></div>
+    {% else %}
+
+    <div class="card mb-4">
+        <div class="card-header">Session Info</div>
+        <div class="card-body">
+            <div class="detail-grid">
+                <div><span class="label">User ID</span><span class="code">{{ session.id }}</span></div>
+                <div><span class="label">Username</span><span>{{ session.username }}</span></div>
+                <div><span class="label">Discord Username</span><span>{{ session.discord_username }}</span></div>
+                <div><span class="label">Staff Access</span>
+                    {% if session.is_staff %}<span class="badge badge-active">Yes</span>{% else %}<span class="badge badge-cancelled">No</span>{% endif %}
+                </div>
+                <div><span class="label">Permission Tier</span>
+                    {% set t = session.permission_tier or 0 %}
+                    <span class="badge badge-{{ 'critical' if t >= 3 else 'medium' if t >= 2 else 'low' if t >= 1 else '' }}">
+                        Tier {{ t }} — {{ 'Owner/Admin' if t >= 3 else 'High Staff' if t >= 2 else 'Staff' if t >= 1 else 'None' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Your Discord Roles ({{ (session.role_ids or [])|length }})</div>
+        <div class="card-body">
+            {% if session.role_ids %}
+            <div class="achievement-grid">
+                {% for rid in session.role_ids %}
+                <span class="achievement-badge">
+                    <span class="code" style="font-size:.75rem">{{ rid }}</span>
+                    {% for rc in role_configs %}{% if rc.discord_role_id|string == rid|string %}
+                    <span class="badge badge-{{ 'critical' if rc.permission_tier >= 3 else 'medium' if rc.permission_tier >= 2 else 'low' }}">T{{ rc.permission_tier }} {{ rc.role_name }}</span>
+                    {% endif %}{% endfor %}
+                </span>
+                {% endfor %}
+            </div>
+            {% else %}<p class="muted">No roles found. Check GUILD_ID environment variable.</p>{% endif %}
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header">How Permissions are Detected</div>
+            <div class="card-body" style="font-size:.85rem;line-height:1.7">
+                <p>Tiers are assigned automatically when you log in:</p>
+                <p><span class="badge badge-critical">Tier 3</span> Server owner, Administrator permission, or HIGH_STAFF roles</p>
+                <p><span class="badge badge-medium">Tier 2</span> Manage Server, or Kick + Ban Members permissions</p>
+                <p><span class="badge badge-low">Tier 1</span> Moderate Members, Manage Roles, or Staff role</p>
+                <p class="muted mt-2">The bot also syncs role permissions hourly. Log out and back in to refresh your tier.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">Environment Config</div>
+            <div class="card-body">
+                <div class="detail-grid">
+                    {% for k,v in config.items() %}
+                    <div><span class="label">{{ k }}</span><span class="code" style="font-size:.8rem">{{ v }}</span></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if session.is_staff and (session.permission_tier or 0) >= 3 %}
+    <div class="card mt-4">
+        <div class="card-header">Role → Tier Mappings (from bot sync)</div>
+        <div class="card-body">
+            {% if role_configs %}
+            {% for rc in role_configs %}
+            <div class="list-row">
+                <span style="flex:1"><strong>{{ rc.role_name }}</strong> <span class="muted code text-sm">{{ rc.discord_role_id }}</span></span>
+                <span class="badge badge-{{ 'critical' if rc.permission_tier >= 3 else 'medium' if rc.permission_tier >= 2 else 'low' }}">Tier {{ rc.permission_tier }}</span>
+            </div>
+            {% endfor %}
+            {% else %}<p class="muted">No role configs yet. The bot will auto-sync them on startup.</p>{% endif %}
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Registered Staff Members</div>
+        <div class="card-body">
+            {% for s in staff_members %}
+            <div class="list-row">
+                <span style="flex:1"><strong>{{ s.display_name or '?' }}</strong> <span class="muted code text-sm">{{ s.discord_user_id }}</span></span>
+                <span class="badge badge-{{ 'critical' if s.permission_tier >= 3 else 'medium' if s.permission_tier >= 2 else 'low' }}">Tier {{ s.permission_tier }}</span>
+                <span class="muted text-sm">{% if s.last_login %}Last: {{ s.last_login|timeago }}{% endif %}</span>
+            </div>
+            {% else %}<p class="muted">No staff registered yet.</p>{% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</section>
+{% endblock %}
